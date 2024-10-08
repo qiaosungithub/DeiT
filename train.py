@@ -323,7 +323,9 @@ def train_and_evaluate(
   epoch_offset = step_offset // steps_per_epoch  # sanity check for resuming
   assert epoch_offset * steps_per_epoch == step_offset
   state = jax_utils.replicate(state)
+  # reload checkpoint done
 
+  # use pmap to parallel training
   p_train_step = jax.pmap(
       functools.partial(train_step, rng_init=rng, learning_rate_fn=learning_rate_fn),
       axis_name='batch',
@@ -343,7 +345,7 @@ def train_and_evaluate(
     for n_batch, batch in enumerate(train_loader):
       step = epoch * steps_per_epoch + n_batch
       batch = prepare_batch_data(batch)
-      state, metrics = p_train_step(state, batch)
+      state, metrics = p_train_step(state, batch) # here is the training step
       
       if epoch == epoch_offset and n_batch == 0:
         logging.info('Initial compilation completed. Reset timer.')
@@ -387,7 +389,7 @@ def train_and_evaluate(
           logging.info('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
         eval_batch = prepare_batch_data(eval_batch, local_batch_size)
 
-        metrics = p_eval_step(state, eval_batch)
+        metrics = p_eval_step(state, eval_batch) # here is the eval step
         eval_metrics.append(metrics)
 
       eval_metrics = common_utils.get_metrics(eval_metrics)
