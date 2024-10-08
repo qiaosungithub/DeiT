@@ -17,6 +17,7 @@ def get_config():
   # Run for a single step:
   config.num_train_steps = 1
   config.steps_per_eval = 1
-  config.grad_norm_clip = None
+  config.grad_norm_clip = "None"
+  config.optimizer = "None"
 
   return config

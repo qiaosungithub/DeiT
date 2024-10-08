@@ -28,6 +28,7 @@ config_flags.DEFINE_config_file(
 )
 
 def main(argv):
+  # print("position of main: 1")
   # print("argv: ",argv) # main.py
   # print("flags: ",FLAGS) # see flags.md
   if len(argv) > 1:
@@ -36,6 +37,8 @@ def main(argv):
   # 记录JAX进程信息
   logging.info('JAX process: %d / %d', jax.process_index(), jax.process_count())
   logging.info('JAX local devices: %r', jax.local_devices())
+
+  # print("position of main: 2")
 
   # Add a note so that we can tell which task is which JAX host.
   # (Depending on the platform task 0 is not guaranteed to be host 0)
@@ -48,6 +51,8 @@ def main(argv):
   )
   # print("FLAGS.config: ",FLAGS.config) # also see flags.md
 
+  # print("position of main: 0")
+
   if FLAGS.debug:
     with jax.disable_jit():
       train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
@@ -56,7 +61,10 @@ def main(argv):
 
 
 if __name__ == '__main__':
+  # print("position of main: 3")
   logging_util.verbose_off()
   logging_util.set_time_logging(logging)
+  # print("position of main: 4")
   flags.mark_flags_as_required(['config', 'workdir']) # use flags to parse the input parameters
+  # print("position of main: 5")
   app.run(main)

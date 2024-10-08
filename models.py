@@ -106,7 +106,7 @@ class ViT(nn.Module):
         self.final_ln = nn.LayerNorm(use_scale=True, use_bias=False,scale_init=nn.initializers.ones)
         self.fc = nn.Dense(num_classes, kernel_init=nn.initializers.zeros, bias_init=nn.initializers.zeros)
 
-    def __call__(self, x:jnp.ndarray, training=True):
+    def __call__(self, x:jnp.ndarray, train=True):
         # print('In model: training is ', training)
         # x.shape: [B, H, W, C]
         p = self.patch_size
@@ -119,7 +119,7 @@ class ViT(nn.Module):
         # print_stat('x:', x)
 
         for i,ly in enumerate(self.layers):
-            x = ly(x, training=training)
+            x = ly(x, training=train)
             # print_stat(f'layer {i}:', x)
         # print_stat('x:', x)
         x = self.final_ln(x[:,0])

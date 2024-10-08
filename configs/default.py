@@ -12,6 +12,8 @@ def get_config():
 
   # Dataset
   config.dataset = dataset = ml_collections.ConfigDict()
+  config.debug = False
+  config.dataset.debug = config.debug
   dataset.name = 'imagenet'
   dataset.root = '/kmh-nfs-us-mount/data/imagenet'
   dataset.num_workers = 4

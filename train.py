@@ -205,6 +205,8 @@ def sync_batch_stats(state):
   """Sync the batch statistics across replicas."""
   # Each device has its own version of the running average batch statistics and
   # we sync them before evaluation.
+  if hasattr(state, 'batch_stats'):
+    return state
   return state.replace(batch_stats=cross_replica_mean(state.batch_stats))
 
 
@@ -214,6 +216,8 @@ def create_train_state(
   """
   Create initial training state, including the model and optimizer.
   """
+  # print("here we are in the function 'create_train_state' in train.py; ready to define optimizer")
+
   dynamic_scale = None
   platform = jax.local_devices()[0].platform
   if config.half_precision and platform == 'gpu':
@@ -230,7 +234,7 @@ def create_train_state(
   if config.optimizer == 'sgd':
     if config.weight_decay != 0.0:
       print("Warning from sqa: weight decay is not supported in SGD")
-    if config.grad_norm_clip is not None:
+    if config.grad_norm_clip != "None":
       print("Warning from sqa: grad norm clipping is not supported in SGD")
     tx = optax.sgd(
         learning_rate=learning_rate_fn,
@@ -238,13 +242,14 @@ def create_train_state(
         nesterov=True,
     )
   elif config.optimizer == 'adamw':
+    grad_norm_clip = None if config.grad_norm_clip == "None" else config.grad_norm_clip
     tx = optax.adamw(
         learning_rate=learning_rate_fn,
         b1=0.9,
         b2=0.999,
         eps=1e-8,
         weight_decay=config.weight_decay,
-        grad_norm_clip=config.grad_norm_clip, # None if no clipping
+        # grad_norm_clip=grad_norm_clip, # None if no clipping
     )
   else:
     raise ValueError(f'Unknown optimizer: {config.optimizer}, choose from "sgd" or "adamw"')
@@ -271,6 +276,7 @@ def train_and_evaluate(
     Final TrainState.
   """
 
+  # print("position 0")
   writer = metric_writers.create_default_writer(
       logdir=workdir, just_logging=jax.process_index() != 0
   )
@@ -280,6 +286,8 @@ def train_and_evaluate(
   image_size = 224
 
   logging.info('config.batch_size: {}'.format(config.batch_size))
+
+  # print("position 1")
 
   if config.batch_size % jax.process_count() > 0:
     raise ValueError('Batch size must be divisible by the number of processes')
@@ -294,13 +302,14 @@ def train_and_evaluate(
     config.dataset,
     local_batch_size,
     split='train',
-    # split='val',
+    # split='val' if config.debug else 'train',
   )
   eval_loader, steps_per_eval = input_pipeline.create_split(
     config.dataset,
     local_batch_size,
     split='val',
   )
+  # print("position 2")
   logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
   logging.info('steps_per_eval: {}'.format(steps_per_eval))
 
@@ -315,6 +324,8 @@ def train_and_evaluate(
   )
 
   learning_rate_fn = create_learning_rate_fn(config, base_learning_rate, steps_per_epoch)
+
+  # print("position 3")
 
   state = create_train_state(rng, config, model, image_size, learning_rate_fn)
   state = restore_checkpoint(state, workdir)
@@ -360,6 +371,7 @@ def train_and_evaluate(
       if config.get('log_per_step'):
         train_metrics.append(metrics)
         if (step + 1) % config.log_per_step == 0:
+          # print('Hello')
           train_metrics = common_utils.get_metrics(train_metrics)
           train_metrics.pop('labels')  # used in val only
           summary = {

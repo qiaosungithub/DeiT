@@ -11,4 +11,5 @@ if [[ $ZONE == *"europe"* ]]; then
     export USE_CONDA=1
 else
     export DATA_ROOT="kmh-nfs-us-mount"
+    export USE_CONDA=2
 fi
