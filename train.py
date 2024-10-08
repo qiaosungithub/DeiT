@@ -85,7 +85,12 @@ def create_learning_rate_fn(
     base_learning_rate: float,
     steps_per_epoch: int,
 ):
-  """Create learning rate schedule."""
+  """
+  Create learning rate schedule.
+
+  first warmup (increase to base_learning_rate) for config.warmup_epochs
+  then cosine decay to 0 for the rest of the epochs
+  """
   warmup_fn = optax.linear_schedule(
       init_value=0.0,
       end_value=base_learning_rate,
@@ -206,7 +211,9 @@ def sync_batch_stats(state):
 def create_train_state(
     rng, config: ml_collections.ConfigDict, model, image_size, learning_rate_fn
 ):
-  """Create initial training state."""
+  """
+  Create initial training state, including the model and optimizer.
+  """
   dynamic_scale = None
   platform = jax.local_devices()[0].platform
   if config.half_precision and platform == 'gpu':
@@ -220,19 +227,24 @@ def create_train_state(
 
   # here is the optimizer
 
-  # tx = optax.sgd(
-  #     learning_rate=learning_rate_fn,
-  #     momentum=config.momentum,
-  #     nesterov=True,
-  # )
-  tx = optax.adamw(
-      learning_rate=learning_rate_fn,
-      b1=0.9,
-      b2=0.999,
-      eps=1e-8,
-      weight_decay=0.01,
-      grad_norm_clip=config.grad_norm_clip,
-  )
+  if config.optimizer == 'sgd':
+    assert config.weight_decay == 0.0, 'SGD does not support weight decay'
+    tx = optax.sgd(
+        learning_rate=learning_rate_fn,
+        momentum=config.momentum,
+        nesterov=True,
+    )
+  elif config.optimizer == 'adamw':
+    tx = optax.adamw(
+        learning_rate=learning_rate_fn,
+        b1=0.9,
+        b2=0.999,
+        eps=1e-8,
+        weight_decay=config.weight_decay,
+        grad_norm_clip=config.grad_norm_clip,
+    )
+  else:
+    raise ValueError(f'Unknown optimizer: {config.optimizer}, choose from "sgd" or "adamw"')
   state = TrainState.create(
       apply_fn=model.apply,
       params=params,
@@ -292,7 +304,7 @@ def train_and_evaluate(
   if config.steps_per_eval != -1:
     steps_per_eval = config.steps_per_eval
 
-  base_learning_rate = config.learning_rate * config.batch_size / 256.0
+  base_learning_rate = config.learning_rate * config.batch_size / 512.0 # note that here the input config.learning_rate is 0.0005 in the paper
 
   model_cls = getattr(models, config.model)
   model = create_model(

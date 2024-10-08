@@ -4,10 +4,12 @@ LOGDIR=$(pwd)/tmp
 sudo mkdir -p ${LOGDIR}
 sudo chmod 777 ${LOGDIR}
 batch=1024
-lr=0.1
+lr=0.0005
 ep=100
+wd=0.05
 CONFIG=fake_data_benchmark
 source $CONDA_INIT_SH_PATH
+# set the device to cpu
 export JAX_PLATFORMS=cpu
 # remember to use your own conda environment
 # conda activate DYY
@@ -24,4 +26,6 @@ python3 main.py \
     --config.dataset.prefetch_factor=2 \
     --config.dataset.num_workers=32 \
     --config.log_per_step=20 \
-    --config.model='ViT_debug'
+    --config.model='ViT_debug' \
+    --config.optimizer='adamw' \
+    --config.weight_decay=${wd} \

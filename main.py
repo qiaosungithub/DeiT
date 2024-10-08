@@ -14,10 +14,9 @@ from utils import logging_util
 import warnings
 warnings.filterwarnings("ignore")
 
-# if use debug mode, set JAX's default device to be cpu
-jax.config.update('jax_platform_name', 'cpu')
-
 FLAGS = flags.FLAGS
+
+# define input parameters
 
 flags.DEFINE_string('workdir', None, 'Directory to store model data.')
 flags.DEFINE_bool('debug', False, 'Debugging mode.')
@@ -30,6 +29,7 @@ config_flags.DEFINE_config_file(
 
 def main(argv):
   # print("argv: ",argv) # main.py
+  # print("flags: ",FLAGS) # see flags.md
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
@@ -46,6 +46,7 @@ def main(argv):
   platform.work_unit().create_artifact(
       platform.ArtifactType.DIRECTORY, FLAGS.workdir, 'workdir'
   )
+  # print("FLAGS.config: ",FLAGS.config) # also see flags.md
 
   if FLAGS.debug:
     with jax.disable_jit():
@@ -57,5 +58,5 @@ def main(argv):
 if __name__ == '__main__':
   logging_util.verbose_off()
   logging_util.set_time_logging(logging)
-  flags.mark_flags_as_required(['config', 'workdir'])
+  flags.mark_flags_as_required(['config', 'workdir']) # use flags to parse the input parameters
   app.run(main)
