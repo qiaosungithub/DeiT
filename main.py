@@ -14,6 +14,8 @@ from utils import logging_util
 import warnings
 warnings.filterwarnings("ignore")
 
+# if use debug mode, set JAX's default device to be cpu
+jax.config.update('jax_platform_name', 'cpu')
 
 FLAGS = flags.FLAGS
 
@@ -27,9 +29,11 @@ config_flags.DEFINE_config_file(
 )
 
 def main(argv):
+  # print("argv: ",argv) # main.py
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
+  # 记录JAX进程信息
   logging.info('JAX process: %d / %d', jax.process_index(), jax.process_count())
   logging.info('JAX local devices: %r', jax.local_devices())
 

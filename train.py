@@ -218,10 +218,20 @@ def create_train_state(
   
   print_params(params)
 
-  tx = optax.sgd(
+  # here is the optimizer
+
+  # tx = optax.sgd(
+  #     learning_rate=learning_rate_fn,
+  #     momentum=config.momentum,
+  #     nesterov=True,
+  # )
+  tx = optax.adamw(
       learning_rate=learning_rate_fn,
-      momentum=config.momentum,
-      nesterov=True,
+      b1=0.9,
+      b2=0.999,
+      eps=1e-8,
+      weight_decay=0.01,
+      grad_norm_clip=config.grad_norm_clip,
   )
   state = TrainState.create(
       apply_fn=model.apply,

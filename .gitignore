@@ -1,0 +1,10 @@
+# common
+**/__pycache__/
+**/data/*
+**/samples/*.png
+**/*.pt
+**/*.pth
+**/tmp/*
+
+# staging
+**/stage.sh

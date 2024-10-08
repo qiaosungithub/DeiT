@@ -9,7 +9,12 @@ ep=100
 CONFIG=fake_data_benchmark
 source $CONDA_INIT_SH_PATH
 export JAX_PLATFORMS=cpu
-conda activate DYY
+# remember to use your own conda environment
+# conda activate DYY
+conda activate wgt
+
+echo "start running main"
+
 python3 main.py \
     --workdir=${LOGDIR} --config=configs/${CONFIG}.py \
     --config.dataset.root='./imagenet_fake' \
