@@ -460,7 +460,8 @@ def train_and_evaluate(
       # print(batch[0].shape)
       batch = prepare_batch_data_sqa(batch)
       # print(batch["image"].shape)
-      assert batch['label'].shape == (1, local_batch_size, 1000) # the first dimension is the number of devices
+      # assert batch['label'].shape == (1, local_batch_size, 1000) # the first dimension is the number of devices
+      assert batch['label'].shape[-1] == NUM_CLASSES
       state, metrics = p_train_step(state, batch) # here is the training step
       
       if epoch == epoch_offset and n_batch == 0:
