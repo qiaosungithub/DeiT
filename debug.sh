@@ -3,10 +3,14 @@ CONDA_INIT_SH_PATH=$(dirname $CONDA_PATH)/../etc/profile.d/conda.sh
 LOGDIR=$(pwd)/tmp
 sudo mkdir -p ${LOGDIR}
 sudo chmod 777 ${LOGDIR}
+
+# hyperparameters
 batch=1024
 lr=0.0005
-ep=100
+ep=300
 wd=0.05
+grad_norm_clip=None
+
 CONFIG=fake_data_benchmark
 source $CONDA_INIT_SH_PATH
 # set the device to cpu
@@ -29,3 +33,4 @@ python3 main.py \
     --config.model='ViT_debug' \
     --config.optimizer='adamw' \
     --config.weight_decay=${wd} \
+    --config.grad_norm_clip=${grad_norm_clip} \

@@ -40,6 +40,10 @@ def get_config():
 
   config.seed = 0  # init random seed
 
+  # added by sqa
+  config.grad_norm_clip = None
+  config.weight_decay = 0.0
+
   return config
 
 

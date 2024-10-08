@@ -228,7 +228,10 @@ def create_train_state(
   # here is the optimizer
 
   if config.optimizer == 'sgd':
-    assert config.weight_decay == 0.0, 'SGD does not support weight decay'
+    if config.weight_decay != 0.0:
+      print("Warning from sqa: weight decay is not supported in SGD")
+    if config.grad_norm_clip is not None:
+      print("Warning from sqa: grad norm clipping is not supported in SGD")
     tx = optax.sgd(
         learning_rate=learning_rate_fn,
         momentum=config.momentum,
@@ -241,7 +244,7 @@ def create_train_state(
         b2=0.999,
         eps=1e-8,
         weight_decay=config.weight_decay,
-        grad_norm_clip=config.grad_norm_clip,
+        grad_norm_clip=config.grad_norm_clip, # None if no clipping
     )
   else:
     raise ValueError(f'Unknown optimizer: {config.optimizer}, choose from "sgd" or "adamw"')
