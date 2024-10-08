@@ -20,7 +20,7 @@ import ml_collections
 import optax
 
 import input_pipeline
-from input_pipeline import prepare_batch_data, prepare_batch_data_sqa 
+from input_pipeline import prepare_batch_data, prepare_batch_data_sqa, apply_mixup_cutmix_batch
 import models
 
 import utils.writer_util as writer_util  # must be after 'from clu import metric_writers'
@@ -83,7 +83,7 @@ def compute_metrics(logits, labels):
   # this is the version for both one-hot labels and not one-hot labels
   # compute per-sample loss
   # one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
-  print("labels.shape:", labels.shape)
+  # print("labels.shape:", labels.shape)
   if labels.shape[-1] != NUM_CLASSES:
     labels = jax.nn.one_hot(labels, NUM_CLASSES)
 
@@ -456,6 +456,7 @@ def train_and_evaluate(
       train_loader.sampler.set_epoch(epoch)
     logging.info('epoch {}...'.format(epoch))
     for n_batch, batch in enumerate(train_loader):
+      batch = apply_mixup_cutmix_batch(config.dataset, batch)
       step = epoch * steps_per_epoch + n_batch
       # print(batch[0].shape)
       batch = prepare_batch_data_sqa(batch)

@@ -183,6 +183,43 @@ def apply_mixup_cutmix(dataset_cfg, dataloader):
     # 返回处理后的 batch
     yield inputs, targets
 
+def apply_mixup_cutmix_batch(dataset_cfg, batch):
+  """apply Mixup, CutMix"""
+  
+  mixup_fn = None
+  
+  # set Mixup; for Cutmix, just set cutmix_alpha > 0
+  if dataset_cfg.use_mixup_cutmix:
+    mixup_fn = Mixup(
+      mixup_alpha=dataset_cfg.get('mixup_alpha', 0.2),
+      cutmix_alpha=dataset_cfg.get('cutmix_alpha', 0.2),
+      prob=dataset_cfg.get('mixup_prob', 1.0),
+      mode=dataset_cfg.get('mixup_mode', 'batch'),
+      label_smoothing=dataset_cfg.get('label_smoothing', 0.0),
+      switch_prob=dataset_cfg.get('switch_prob', 0.5),
+      num_classes=1000,
+    )
+
+  # 逐批处理数据
+  # for batch in dataloader:
+  inputs, targets = batch
+  # print("inputs.shape:", inputs.shape)
+  # print("targets.shape:", targets.shape)
+  
+  # apply Mixup
+  if mixup_fn is not None:
+    inputs, targets = mixup_fn(inputs, targets) # the labels will be turned into [bsz, num_classes]
+
+  # print("inputs.shape:", inputs.shape)
+  # print("targets.shape:", targets.shape)
+  
+  # TODO: ??? 在这里应用 StochasticDepth（假设有相关函数）by copilot
+  # not sure if correct or not
+  # model.apply_stochastic_depth(inputs)
+  
+  # 返回处理后的 batch
+  return inputs, targets
+
 def create_split(
     dataset_cfg,
     batch_size,
@@ -241,7 +278,7 @@ def create_split(
     steps_per_epoch = len(it)
 
     # Apply Mixup, CutMix
-    it = apply_mixup_cutmix(dataset_cfg, it)
+    # it = apply_mixup_cutmix(dataset_cfg, it)
 
   elif split == 'val':
     ds = datasets.ImageFolder(
