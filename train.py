@@ -20,7 +20,7 @@ import ml_collections
 import optax
 
 import input_pipeline
-from input_pipeline import prepare_batch_data
+from input_pipeline import prepare_batch_data, prepare_batch_data_sqa 
 import models
 
 import utils.writer_util as writer_util  # must be after 'from clu import metric_writers'
@@ -63,20 +63,46 @@ def cross_entropy_loss(logits, labels):
   return jnp.mean(xentropy)
 
 
+# def compute_metrics(logits, labels):
+#   # compute per-sample loss
+#   one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
+#   xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
+#   loss = xentropy  # (local_batch_size,)
+
+#   accuracy = (jnp.argmax(logits, -1) == labels)  # (local_batch_size,)
+#   metrics = {
+#       'loss': loss,
+#       'accuracy': accuracy,
+#       'labels': labels,
+#   }
+#   metrics = lax.all_gather(metrics, axis_name='batch')
+#   metrics = jax.tree_map(lambda x: x.flatten(), metrics)  # (batch_size,)
+#   return metrics
+
 def compute_metrics(logits, labels):
+  # this is the version for both one-hot labels and not one-hot labels
   # compute per-sample loss
-  one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
-  xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
+  # one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
+  print("labels.shape:", labels.shape)
+  if labels.shape[-1] != NUM_CLASSES:
+    labels = jax.nn.one_hot(labels, NUM_CLASSES)
+
+  xentropy = optax.softmax_cross_entropy(logits=logits, labels=labels)
   loss = xentropy  # (local_batch_size,)
 
-  accuracy = (jnp.argmax(logits, -1) == labels)  # (local_batch_size,)
+  accuracy = (jnp.argmax(logits, -1) == jnp.argmax(labels, -1))  # (local_batch_size, )
+  # here we modify, but not very well defined
   metrics = {
       'loss': loss,
       'accuracy': accuracy,
       'labels': labels,
   }
+  # print("1 metrics' labels shape:", metrics['labels'].shape)
   metrics = lax.all_gather(metrics, axis_name='batch')
+  labels = metrics['labels']
   metrics = jax.tree_map(lambda x: x.flatten(), metrics)  # (batch_size,)
+  metrics['labels'] = labels
+  # print("2 metrics' labels shape:", metrics['labels'].shape)
   return metrics
 
 
@@ -124,6 +150,78 @@ def train_step(state, batch, rng_init, learning_rate_fn):
         rngs=dict(dropout=rng_dropout),
     )
     loss = cross_entropy_loss(logits, batch['label'])
+    weight_penalty_params = jax.tree_util.tree_leaves(params)
+    weight_decay = 0.0001
+    weight_l2 = sum(
+        jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1
+    )
+    weight_penalty = weight_decay * 0.5 * weight_l2
+    loss = loss + weight_penalty
+    return loss, (new_model_state, logits)
+
+  step = state.step
+  dynamic_scale = state.dynamic_scale
+  lr = learning_rate_fn(step)
+
+  if dynamic_scale:
+    grad_fn = dynamic_scale.value_and_grad(
+        loss_fn, has_aux=True, axis_name='batch'
+    )
+    dynamic_scale, is_fin, aux, grads = grad_fn(state.params)
+    # dynamic loss takes care of averaging gradients across replicas
+  else:
+    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+    aux, grads = grad_fn(state.params)
+    # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
+    grads = lax.pmean(grads, axis_name='batch')
+  new_model_state, logits = aux[1]
+  metrics = compute_metrics(logits, batch['label'])
+  metrics['lr'] = lr
+
+  new_state = state.apply_gradients(
+      grads=grads, batch_stats=new_model_state['batch_stats']
+  )
+  if dynamic_scale:
+    # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
+    # params should be restored (= skip this step).
+    new_state = new_state.replace(
+        opt_state=jax.tree_util.tree_map(
+            functools.partial(jnp.where, is_fin),
+            new_state.opt_state,
+            state.opt_state,
+        ),
+        params=jax.tree_util.tree_map(
+            functools.partial(jnp.where, is_fin), new_state.params, state.params
+        ),
+        dynamic_scale=dynamic_scale,
+    )
+    metrics['scale'] = dynamic_scale.scale
+
+  return new_state, metrics
+
+def train_step_sqa(state, batch, rng_init, learning_rate_fn):
+  """Perform a single training step."""
+
+  # ResNet has no dropout; but maintain rng_dropout for future usage
+  rng_step = random.fold_in(rng_init, state.step)
+  rng_device = random.fold_in(rng_step, lax.axis_index(axis_name='batch'))
+  rng_dropout, _ = random.split(rng_device)
+
+  def categorical_cross_entropy_loss(logits, labels):
+    """计算分类交叉熵损失"""
+    # one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
+    xentropy = optax.softmax_cross_entropy(logits=logits, labels=labels)
+    return jnp.mean(xentropy)
+
+  def loss_fn(params):
+    """loss function used for training."""
+    logits, new_model_state = state.apply_fn(
+        {'params': params, 'batch_stats': state.batch_stats},
+        batch['image'],
+        mutable=['batch_stats'],
+        rngs=dict(dropout=rng_dropout),
+    )
+    loss = categorical_cross_entropy_loss(logits, batch['label'])
     weight_penalty_params = jax.tree_util.tree_leaves(params)
     weight_decay = 0.0001
     weight_l2 = sum(
@@ -337,8 +435,12 @@ def train_and_evaluate(
   # reload checkpoint done
 
   # use pmap to parallel training
+  # p_train_step = jax.pmap(
+  #     functools.partial(train_step, rng_init=rng, learning_rate_fn=learning_rate_fn),
+  #     axis_name='batch',
+  # )
   p_train_step = jax.pmap(
-      functools.partial(train_step, rng_init=rng, learning_rate_fn=learning_rate_fn),
+      functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn),
       axis_name='batch',
   )
   p_eval_step = jax.pmap(eval_step, axis_name='batch')
@@ -355,7 +457,10 @@ def train_and_evaluate(
     logging.info('epoch {}...'.format(epoch))
     for n_batch, batch in enumerate(train_loader):
       step = epoch * steps_per_epoch + n_batch
-      batch = prepare_batch_data(batch)
+      # print(batch[0].shape)
+      batch = prepare_batch_data_sqa(batch)
+      # print(batch["image"].shape)
+      assert batch['label'].shape == (1, local_batch_size, 1000) # the first dimension is the number of devices
       state, metrics = p_train_step(state, batch) # here is the training step
       
       if epoch == epoch_offset and n_batch == 0:
@@ -389,6 +494,7 @@ def train_and_evaluate(
           writer.write_scalars(step + 1, summary)
           train_metrics = []
           train_metrics_last_t = time.time()
+      break
 
     # logging per epoch
     if (epoch + 1) % config.eval_per_epoch == 0:
@@ -399,15 +505,29 @@ def train_and_evaluate(
       for n_eval_batch, eval_batch in enumerate(eval_loader):
         if (n_eval_batch + 1) % config.log_per_step == 0:
           logging.info('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
-        eval_batch = prepare_batch_data(eval_batch, local_batch_size)
+        eval_batch = prepare_batch_data_sqa(eval_batch, local_batch_size)
 
         metrics = p_eval_step(state, eval_batch) # here is the eval step
+        # print("metrics' labels shape:", metrics['labels'].shape)
+        assert metrics['labels'].shape[-1] == NUM_CLASSES
         eval_metrics.append(metrics)
 
       eval_metrics = common_utils.get_metrics(eval_metrics)
+      eval_metrics_copy = eval_metrics # labels shape: (local_batch_size, 1000)
       eval_metrics = jax.tree_map(lambda x: x.flatten(), eval_metrics)
       logging.info('evaluated samples: {}'.format(eval_metrics['labels'].size))
-      valid = (eval_metrics['labels'] >= 0)
+      valid = (eval_metrics_copy['labels'] >= 0)
+      # print(valid.shape)
+      # print(eval_metrics_copy['labels'].shape)
+      # print(eval_metrics_copy)
+      # print(eval_metrics["labels"].shape)
+      # print(eval_metrics)
+      # assert valid.shape[-1] == NUM_CLASSES
+      # turn valid to one-hot
+      valid = jnp.argmax(valid, axis=-1)
+      # print(valid.shape)
+      # for key, val in eval_metrics_copy.items():
+      #   print(key, val.shape)
       eval_metrics = jax.tree_map(lambda x: x[valid], eval_metrics)
       logging.info('valid samples: {}'.format(eval_metrics['labels'].size))
 
