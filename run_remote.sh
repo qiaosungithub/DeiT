@@ -8,7 +8,7 @@ TASKNAME=DeiT
 ############# JOB CONFIG #############
 batch=1024
 lr=0.0005
-ep=300
+ep=100 # with repeat-aug, 100 epoch is equivalent to 300 epoch previously
 CONFIG=tpu
 model=ViT_base
 
@@ -28,6 +28,9 @@ use_mixup_cutmix=1
 # if use mixup / cutmix: (i currently do not know what is the paper's parameter)
 mixup_prob=1.0
 switch_prob=0.5
+mixup_alpha=0.8
+cutmix_alpha=1.0
+repeated_aug=3
 dropout_rate=0.0
 stochastic_depth_rate=0.1
 
@@ -63,7 +66,7 @@ fi
 
 # NOTE: You must use num_workers=64, otherwise, the code will exit unexpectedly
 
-    gcloud compute tpus tpu-vm ssh $VM_NAME --zone $ZONE \
+gcloud compute tpus tpu-vm ssh $VM_NAME --zone $ZONE \
     --worker=all --command "
 cd $STAGEDIR
 if [ \"$USE_CONDA\" -eq 1 ]; then
@@ -98,4 +101,5 @@ python3 main.py \
     --config.dataset.mixup_alpha=${mixup_alpha} \
     --config.dataset.cutmix_alpha=${cutmix_alpha} \
     --config.dataset.switch_prob=${switch_prob} \
+    --config.dataset.repeated_aug=${repeated_aug} \
 " 2>&1 | tee -a $LOGDIR/output.log

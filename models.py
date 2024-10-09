@@ -2,7 +2,6 @@ import sys, os
 
 import zhh
 from zhh.debug import print_stat, print_tensor, set_debug
-import jax.random
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
@@ -12,6 +11,7 @@ import math
 from zhh.models import ModuleWrapper, TorchLinear
 from functools import partial
 import zhh.F as F
+import zhh.random as zr
 
 def sinous_embedding(l, dim):
     angles = 10000 ** (- 2 * jnp.arange(dim//2,dtype=jnp.float32) / dim)
@@ -68,9 +68,9 @@ class Layer(nn.Module):
         # print('In layer: training is ', training)
         residual = x
         c = self.ln1(x)
-        x = x + F.dropout(self.attn(c, c), rate=self.dropout_rate, training=training, rng=rng)
+        x = x + F.dropout(self.attn(c, c), rate=self.dropout_rate, training=training, rng=rng); rng = zr.next(rng)
         x = x + self.attn(c, c)
-        x = x + F.dropout(self.mlp(self.ln2(x)), rate=self.dropout_rate, training=training, rng=rng)
+        x = x + F.dropout(self.mlp(self.ln2(x)), rate=self.dropout_rate, training=training, rng=rng); rng = zr.next(rng)
         x = x + self.mlp(self.ln2(x))
         return F.stochastic_depth((x-residual), self.stochastic_depth_rate, training, rng) + residual
 
@@ -118,12 +118,12 @@ class ViT(nn.Module):
         x = jnp.concatenate((self.cls.repeat(x.shape[0], axis=0), embed), axis=1)
         # print_stat('x:', x)
         x += self.pos_emb
-        x = F.dropout(x, rate=self.dropout_rate, training=training, rng=rng)
+        x = F.dropout(x, rate=self.dropout_rate, training=train, rng=rng); rng = zr.next(rng)
         # print_stat('x:', x)
 
         for i,ly in enumerate(self.layers):
-            x = ly(x, training=train)
-            # print_stat(f'layer {i}:', x)
+            x = ly(x, rng=rng, training=train); rng=zr.next(rng)
+        #     print_stat(f'layer {i}:', x)
         # print_stat('x:', x)
         x = self.final_ln(x[:,0])
         return self.fc(x)

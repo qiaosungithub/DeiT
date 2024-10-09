@@ -20,7 +20,7 @@ import ml_collections
 import optax
 
 import input_pipeline
-from input_pipeline import prepare_batch_data, prepare_batch_data_sqa, apply_mixup_cutmix_batch
+from input_pipeline import prepare_batch_data, prepare_batch_data_sqa, apply_mixup_cutmix_batch, pre_process_batch
 import models
 
 import utils.writer_util as writer_util  # must be after 'from clu import metric_writers'
@@ -278,7 +278,7 @@ def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1)
 
 def eval_step(state, batch):
   variables = {'params': state.params, 'batch_stats': state.batch_stats}
-  logits = state.apply_fn(variables, batch['image'], train=False, mutable=False, rng=None)
+  logits = state.apply_fn(variables, batch['image'], train=False, mutable=False, rng=jax.random.PRNGKey(0))
   return compute_metrics(logits, batch['label'])
 
 
@@ -462,6 +462,7 @@ def train_and_evaluate(
       train_loader.sampler.set_epoch(epoch)
     logging.info('epoch {}...'.format(epoch))
     for n_batch, batch in enumerate(train_loader):
+      batch = pre_process_batch(batch)
       batch = apply_mixup_cutmix_batch(config.dataset, batch)
       step = epoch * steps_per_epoch + n_batch
       # print(batch[0].shape)
@@ -485,9 +486,11 @@ def train_and_evaluate(
       #   img = batch["image"][0][i]
       #   img = (img - np.min(img)) / (np.max(img) - np.min(img))
       #   plt.imsave(f"./images/{n_batch}/{i}.png", img)
-      #   if i>6: break
+      #   # if i>6: break
 
       # print(f"saving images for n_batch {n_batch}, done.")
+      # if n_batch > 1:
+      #   exit(114514)
       # continue
 
 

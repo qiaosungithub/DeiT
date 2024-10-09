@@ -27,6 +27,7 @@ mixup_prob=1.0
 mixup_alpha=0.8
 cutmix_alpha=1.0
 switch_prob=0.5
+repeated_aug=3
 dropout_rate=0.0
 stochastic_depth_rate=0.1
 
@@ -40,7 +41,7 @@ echo "start running main"
 
 python3 main.py \
     --workdir=${LOGDIR} --config=configs/${CONFIG}.py \
-    --config.dataset.root="/kmh-nfs-ssd-eu-mount/code/qiao/data/imagenet_fake_eu/" \
+    --config.dataset.root=${EU_IMAGENET_FAKE} \
     --config.debug=True \
     --config.batch_size=${batch} \
     --config.num_epochs=${ep} \
@@ -63,3 +64,4 @@ python3 main.py \
     --config.dataset.mixup_alpha=${mixup_alpha} \
     --config.dataset.cutmix_alpha=${cutmix_alpha} \
     --config.dataset.switch_prob=${switch_prob} \
+    --config.dataset.repeated_aug=${repeated_aug} \

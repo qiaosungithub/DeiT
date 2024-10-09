@@ -25,6 +25,9 @@ use_mixup_cutmix=1
 # if use mixup / cutmix: (i currently do not know what is the paper's parameter)
 mixup_prob=1.0
 switch_prob=0.5
+mixup_alpha=0.8
+cutmix_alpha=1.0
+repeated_aug=3
 dropout_rate=0.0
 stochastic_depth_rate=0.1
 
@@ -68,7 +71,7 @@ which python
 which pip3
 python3 main.py \
     --workdir=${LOGDIR} --config=configs/${CONFIG}.py \
-    --config.dataset.root='/kmh-nfs-ssd-eu-mount/code/qiao/data/imagenet_fake_eu/' \
+    --config.dataset.root=${FAKE_DATA_ROOT} \
     --config.batch_size=${batch} \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
@@ -90,4 +93,5 @@ python3 main.py \
     --config.dataset.mixup_alpha=${mixup_alpha} \
     --config.dataset.cutmix_alpha=${cutmix_alpha} \
     --config.dataset.switch_prob=${switch_prob} \
+    --config.dataset.repeated_aug=${repeated_aug} \
 " 2>&1 | tee -a $LOGDIR/output.log

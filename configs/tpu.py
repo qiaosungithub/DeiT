@@ -39,6 +39,7 @@ def get_config():
   config.dataset.switch_prob = 0.5 # probability of switching to cutmix
   config.dataset.mixup_mode = 'batch'
   config.dataset.label_smoothing = 0.0 # a regularization technique for training
+  config.dataset.repeated_aug = 3
 
   return config
 
