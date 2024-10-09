@@ -52,6 +52,7 @@ class Layer(nn.Module):
     linear_dim: int
     attn_dim: int
     dropout_rate: float
+    stochastic_depth_rate: float
 
     def setup(self):
         self.attn = Attention(self.head, self.dim, self.attn_dim)
@@ -63,14 +64,15 @@ class Layer(nn.Module):
         ])
         self.ln2 = nn.LayerNorm(use_bias=False, use_scale=True, scale_init=nn.initializers.ones)
 
-    def __call__(self, x, training=True):
+    def __call__(self, x,rng, training=True):
         # print('In layer: training is ', training)
+        residual = x
         c = self.ln1(x)
-        # x = x + F.dropout(self.attn(c, c), rate=self.dropout_rate, training=training, rng=rng)
+        x = x + F.dropout(self.attn(c, c), rate=self.dropout_rate, training=training, rng=rng)
         x = x + self.attn(c, c)
-        # x = x + F.dropout(self.mlp(self.ln2(x)), rate=self.dropout_rate, training=training, rng=rng)
+        x = x + F.dropout(self.mlp(self.ln2(x)), rate=self.dropout_rate, training=training, rng=rng)
         x = x + self.mlp(self.ln2(x))
-        return x
+        return F.stochastic_depth((x-residual), self.stochastic_depth_rate, training, rng) + residual
 
 
 class ViT(nn.Module):
@@ -85,6 +87,7 @@ class ViT(nn.Module):
     linear_dim: int
     attn_dim: int
     dropout_rate: float
+    stochastic_depth_rate: float
     dtype: jnp.dtype = jnp.float32
 
     def setup(self):
@@ -102,11 +105,11 @@ class ViT(nn.Module):
         self.embedding = nn.Dense(embed_dim)
         self.pos_emb = sinous_embedding(num_patches + 1, embed_dim)
         self.cls = self.param('cls', nn.initializers.normal(1), (1, 1, embed_dim))
-        self.layers = [Layer(heads, embed_dim, self.linear_dim, self.attn_dim, dropout_rate=self.dropout_rate) for _ in range(n_layers)]
+        self.layers = [Layer(heads, embed_dim, self.linear_dim, self.attn_dim, dropout_rate=self.dropout_rate,stochastic_depth_rate=self.stochastic_depth_rate) for _ in range(n_layers)]
         self.final_ln = nn.LayerNorm(use_scale=True, use_bias=False,scale_init=nn.initializers.ones)
         self.fc = nn.Dense(num_classes, kernel_init=nn.initializers.zeros, bias_init=nn.initializers.zeros)
 
-    def __call__(self, x:jnp.ndarray, train=True):
+    def __call__(self, x:jnp.ndarray, rng, train=True):
         # print('In model: training is ', training)
         # x.shape: [B, H, W, C]
         p = self.patch_size
@@ -115,7 +118,7 @@ class ViT(nn.Module):
         x = jnp.concatenate((self.cls.repeat(x.shape[0], axis=0), embed), axis=1)
         # print_stat('x:', x)
         x += self.pos_emb
-        # x = F.dropout(x, rate=self.dropout_rate, training=training, rng=rng)
+        x = F.dropout(x, rate=self.dropout_rate, training=training, rng=rng)
         # print_stat('x:', x)
 
         for i,ly in enumerate(self.layers):
@@ -136,7 +139,7 @@ ViT_base = partial(
     heads=12,
     linear_dim=3072,
     attn_dim=768, # the ViT-base doesn't use the trick
-    dropout_rate=0
+    dropout_rate=0,
 )
 
 ViT_debug = partial(
@@ -150,7 +153,7 @@ ViT_debug = partial(
     heads=2,
     linear_dim=4,
     attn_dim=4,
-    dropout_rate=0
+    dropout_rate=0,
 )
 
 if __name__ == '__main__':
@@ -168,7 +171,7 @@ if __name__ == '__main__':
     #     attn_dim=8,
     #     dropout_rate=0.1
     # )
-    ViT_base(),
+    ViT_debug(stochastic_depth_rate=0.1),
     optimizer=optax.adam(0.001))
     print('-'*10)
     model.step(jnp.zeros((5,224,224,3)), update=False)

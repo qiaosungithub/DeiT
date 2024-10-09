@@ -47,7 +47,7 @@ def initialized(key, image_size, model):
 
   @jax.jit
   def init(*args):
-    return model.init(*args)
+    return model.init(*args, rng=key)
 
   logging.info('Initializing params...')
   variables = init({'params': key}, jnp.ones(input_shape, model.dtype))
@@ -222,7 +222,8 @@ def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1)
         {'params': params, 'batch_stats': state.batch_stats},
         batch['image'],
         mutable=['batch_stats'],
-        rngs=dict(dropout=rng_dropout),
+        # rngs=dict(dropout=rng_dropout),
+        rng=rng_dropout,
     )
     loss = categorical_cross_entropy_loss(logits, batch['label'])
     weight_penalty_params = jax.tree_util.tree_leaves(params)
@@ -277,7 +278,7 @@ def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1)
 
 def eval_step(state, batch):
   variables = {'params': state.params, 'batch_stats': state.batch_stats}
-  logits = state.apply_fn(variables, batch['image'], train=False, mutable=False)
+  logits = state.apply_fn(variables, batch['image'], train=False, mutable=False, rng=None)
   return compute_metrics(logits, batch['label'])
 
 
@@ -422,6 +423,8 @@ def train_and_evaluate(
   model_cls = getattr(models, config.model)
   model = create_model(
       model_cls=model_cls, half_precision=config.half_precision,
+    dropout_rate=config.dropout_rate,
+    stochastic_depth_rate=config.stochastic_depth_rate,
   )
 
   learning_rate_fn = create_learning_rate_fn(config, base_learning_rate, steps_per_epoch)
@@ -443,7 +446,7 @@ def train_and_evaluate(
   #     axis_name='batch',
   # )
   p_train_step = jax.pmap(
-      functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn, label_smoothing=config.label_smoothing),
+      functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn, label_smoothing=0.0),
       axis_name='batch',
   )
   p_eval_step = jax.pmap(eval_step, axis_name='batch')

@@ -45,6 +45,8 @@ def get_config():
   # added by sqa
   config.grad_norm_clip = None
   config.label_smoothing = 0.0
+  config.dropout_rate = 0.0
+  config.stochastic_depth_rate = 0.0
   config.weight_decay = 0.0
 
   return config
