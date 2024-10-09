@@ -1,5 +1,7 @@
 # Your configurations here
 
+rm -rf /kmh-nfs-ssd-eu-mount/staging/sqa/debug/log
+
 ############# COMMON CONFIG #############
 CONDA_ENV=wgt # ONLY change this if you are using "eu" machine
 

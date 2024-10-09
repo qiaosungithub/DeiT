@@ -528,11 +528,22 @@ def train_and_evaluate(
       # print(valid.shape)
       # for key, val in eval_metrics_copy.items():
       #   print(key, val.shape)
-      # valid shape: (batch_size, 1000) type: bool
+      # for key, val in eval_metrics.items():
+      #   print(key, val.shape)
+      
+      # valid shape: 
+      # print(valid.shape)
+      valid = valid.reshape(-1, NUM_CLASSES)
       valid = valid[:, 0] # only take the first column, because we only need to pick out these valid samples
+      # print(valid.shape)
       assert valid.ndim == 1
+      # omit label in eval_metrics
+      eval_metrics = {
+        'loss': eval_metrics['loss'],
+        'accuracy': eval_metrics['accuracy'],
+      }
       eval_metrics = jax.tree_map(lambda x: x[valid], eval_metrics)
-      logging.info('valid samples: {}'.format(eval_metrics['labels'].size))
+      logging.info('valid samples: {}'.format(eval_metrics['loss'].size))
 
       summary = jax.tree_util.tree_map(lambda x: float(x.mean()), eval_metrics)
       logging.info(
