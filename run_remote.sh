@@ -1,16 +1,32 @@
 # Your configurations here
 
 ############# COMMON CONFIG #############
-CONDA_ENV=DYY # ONLY change this if you are using "eu" machine
+CONDA_ENV=wgt # ONLY change this if you are using "eu" machine
 TASKNAME=DeiT
 
 
 ############# JOB CONFIG #############
 batch=1024
-lr=0.00025 # Note that this should be 0.25 times the LR you want (i.e. in the table)
+lr=0.0005
 ep=300
 CONFIG=tpu
 model=ViT_base
+
+# sqa
+
+wd=0.05
+grad_norm_clip=None
+
+use_rand_augment=1
+# if use rand augment:
+rand_augment=rand-m9-mstd0.5-inc1
+# if use random erasing:
+reprob=0.25
+
+use_mixup_cutmix=1
+# if use mixup / cutmix: (i currently do not know what is the paper's parameter)
+mixup_prob=1.0
+switch_prob=0.5
 
 ############# No need to modify #############
 for i in {1..20}; do echo "Do you remember to use TMUX?"; done
@@ -67,5 +83,14 @@ python3 main.py \
     --config.dataset.prefetch_factor=2 \
     --config.dataset.num_workers=64 \
     --config.log_per_step=20 \
+    --config.optimizer='adamw' \
+    --config.weight_decay=${wd} \
+    --config.grad_norm_clip=${grad_norm_clip} \
+    --config.dataset.use_rand_augment=${use_rand_augment} \
+    --config.dataset.rand_augment=${rand_augment} \
+    --config.dataset.reprob=${reprob} \
+    --config.dataset.use_mixup_cutmix=${use_mixup_cutmix} \
+    --config.dataset.mixup_prob=${mixup_prob} \
+    --config.dataset.switch_prob=${switch_prob} \
     --config.model=${model}
 " 2>&1 | tee -a $LOGDIR/output.log

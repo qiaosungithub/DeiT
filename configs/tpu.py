@@ -22,8 +22,8 @@ def get_config():
 
   # configs for data transforms
   # we can use `get()` for config.dataset to avoid KeyError
-  if config.dataset.get('root'):
-    print(f"Dataset root is set to: {config.dataset.get('root')}")
+  # if config.dataset.get('root'):
+  #   print(f"Dataset root is set to: {config.dataset.get('root')}")
   
   # rand_augment:
   config.dataset.use_rand_augment = False

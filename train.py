@@ -430,7 +430,7 @@ def train_and_evaluate(
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
   epoch_offset = step_offset // steps_per_epoch  # sanity check for resuming
-  assert epoch_offset * steps_per_epoch == step_offset
+  assert epoch_offset * steps_per_epoch == step_offset, (epoch_offset, steps_per_epoch, step_offset)
   state = jax_utils.replicate(state)
   # reload checkpoint done
 
@@ -496,7 +496,6 @@ def train_and_evaluate(
           writer.write_scalars(step + 1, summary)
           train_metrics = []
           train_metrics_last_t = time.time()
-      break
 
     # logging per epoch
     if (epoch + 1) % config.eval_per_epoch == 0:
@@ -514,7 +513,7 @@ def train_and_evaluate(
         assert metrics['labels'].shape[-1] == NUM_CLASSES
         eval_metrics.append(metrics)
 
-      eval_metrics = common_utils.get_metrics(eval_metrics)
+      eval_metrics = common_utils.get_metrics(eval_metrics) # loss, acc, labels
       eval_metrics_copy = eval_metrics # labels shape: (local_batch_size, 1000)
       eval_metrics = jax.tree_map(lambda x: x.flatten(), eval_metrics)
       logging.info('evaluated samples: {}'.format(eval_metrics['labels'].size))
@@ -525,11 +524,13 @@ def train_and_evaluate(
       # print(eval_metrics["labels"].shape)
       # print(eval_metrics)
       # assert valid.shape[-1] == NUM_CLASSES
-      # turn valid to one-hot
-      valid = jnp.argmax(valid, axis=-1)
+
       # print(valid.shape)
       # for key, val in eval_metrics_copy.items():
       #   print(key, val.shape)
+      # valid shape: (batch_size, 1000) type: bool
+      valid = valid[:, 0] # only take the first column, because we only need to pick out these valid samples
+      assert valid.ndim == 1
       eval_metrics = jax.tree_map(lambda x: x[valid], eval_metrics)
       logging.info('valid samples: {}'.format(eval_metrics['labels'].size))
 
