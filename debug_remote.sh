@@ -1,7 +1,5 @@
 # Your configurations here
 
-rm -rf /kmh-nfs-ssd-eu-mount/staging/sqa/debug/log
-
 ############# COMMON CONFIG #############
 CONDA_ENV=wgt # ONLY change this if you are using "eu" machine
 
@@ -17,6 +15,7 @@ model=ViT_debug
 # sqa
 
 wd=0.05
+label_smoothing=0.1
 grad_norm_clip=None
 
 use_rand_augment=1
@@ -43,6 +42,7 @@ rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__
 echo 'Done staging.'
 
 LOGDIR=$STAGEDIR/log
+rm -rf $LOGDIR
 sudo mkdir -p ${LOGDIR}
 sudo chmod 777 ${LOGDIR}
 echo 'Log dir: '$LOGDIR
@@ -81,6 +81,7 @@ python3 main.py \
     --config.log_per_step=20 \
     --config.optimizer='adamw' \
     --config.weight_decay=${wd} \
+    --config.label_smoothing=${label_smoothing} \
     --config.grad_norm_clip=${grad_norm_clip} \
     --config.dataset.use_rand_augment=${use_rand_augment} \
     --config.dataset.rand_augment=${rand_augment} \

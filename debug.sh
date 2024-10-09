@@ -11,6 +11,7 @@ batch=1024
 lr=0.0005
 ep=100
 wd=0.05
+label_smoothing=0.1
 grad_norm_clip=None
 
 use_rand_augment=1
@@ -26,7 +27,6 @@ switch_prob=0.5
 
 CONFIG=fake_data_benchmark
 source $CONDA_INIT_SH_PATH
-# set the device to cpu
 export JAX_PLATFORMS=cpu
 # remember to use your own conda environment
 # conda activate DYY
@@ -46,6 +46,7 @@ python3 main.py \
     --config.model='ViT_debug' \
     --config.optimizer='adamw' \
     --config.weight_decay=${wd} \
+    --config.label_smoothing=${label_smoothing} \
     --config.grad_norm_clip=${grad_norm_clip} \
     --config.dataset.use_rand_augment=${use_rand_augment} \
     --config.dataset.rand_augment=${rand_augment} \

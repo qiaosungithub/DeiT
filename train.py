@@ -57,9 +57,11 @@ def initialized(key, image_size, model):
   return variables['params'], variables['batch_stats']
 
 
-def cross_entropy_loss(logits, labels):
-  one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
-  xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
+def cross_entropy_loss(logits, labels, label_smoothing=0.1):
+  # one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
+  # apply label smoothing
+  smooth_labels = optax.smooth_labels(labels, alpha=label_smoothing)
+  xentropy = optax.softmax_cross_entropy(logits=logits, labels=smooth_labels)
   return jnp.mean(xentropy)
 
 
@@ -133,7 +135,7 @@ def create_learning_rate_fn(
   return schedule_fn
 
 
-def train_step(state, batch, rng_init, learning_rate_fn):
+def train_step(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
   """Perform a single training step."""
 
   # ResNet has no dropout; but maintain rng_dropout for future usage
@@ -149,7 +151,7 @@ def train_step(state, batch, rng_init, learning_rate_fn):
         mutable=['batch_stats'],
         rngs=dict(dropout=rng_dropout),
     )
-    loss = cross_entropy_loss(logits, batch['label'])
+    loss = cross_entropy_loss(logits, batch['label'], label_smoothing=label_smoothing)
     weight_penalty_params = jax.tree_util.tree_leaves(params)
     weight_decay = 0.0001
     weight_l2 = sum(
@@ -199,7 +201,7 @@ def train_step(state, batch, rng_init, learning_rate_fn):
 
   return new_state, metrics
 
-def train_step_sqa(state, batch, rng_init, learning_rate_fn):
+def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
   """Perform a single training step."""
 
   # ResNet has no dropout; but maintain rng_dropout for future usage
@@ -207,11 +209,12 @@ def train_step_sqa(state, batch, rng_init, learning_rate_fn):
   rng_device = random.fold_in(rng_step, lax.axis_index(axis_name='batch'))
   rng_dropout, _ = random.split(rng_device)
 
-  def categorical_cross_entropy_loss(logits, labels):
+  def categorical_cross_entropy_loss(logits, labels,label_smoothing=label_smoothing):
     """计算分类交叉熵损失"""
     # one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
-    xentropy = optax.softmax_cross_entropy(logits=logits, labels=labels)
-    return jnp.mean(xentropy)
+    # xentropy = optax.softmax_cross_entropy(logits=logits, labels=labels)
+    # return jnp.mean(xentropy)
+    return cross_entropy_loss(logits, labels,label_smoothing=label_smoothing)
 
   def loss_fn(params):
     """loss function used for training."""
@@ -440,7 +443,7 @@ def train_and_evaluate(
   #     axis_name='batch',
   # )
   p_train_step = jax.pmap(
-      functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn),
+      functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn, label_smoothing=config.label_smoothing),
       axis_name='batch',
   )
   p_eval_step = jax.pmap(eval_step, axis_name='batch')
