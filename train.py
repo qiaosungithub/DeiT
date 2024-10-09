@@ -460,6 +460,31 @@ def train_and_evaluate(
       step = epoch * steps_per_epoch + n_batch
       # print(batch[0].shape)
       batch = prepare_batch_data_sqa(batch)
+
+      
+      # # here is code for us to visualize the images
+      # import matplotlib.pyplot as plt
+      # import numpy as np
+      # import os
+      # print(batch["image"].shape)
+      # # print(batch["label"].shape)
+
+      # # save batch["image"] to ./images/{epoch}/i.png
+      # if os.path.exists(f"./images/{n_batch}") == False:
+      #   os.makedirs(f"./images/{n_batch}")
+      # for i in range(batch["image"][0].shape[0]):
+      #   # print the max and min of the image
+      #   # print(f"max: {np.max(batch['image'][0][i])}, min: {np.min(batch['image'][0][i])}")
+      #   # use the max and min to normalize the image to [0, 1]
+      #   img = batch["image"][0][i]
+      #   img = (img - np.min(img)) / (np.max(img) - np.min(img))
+      #   plt.imsave(f"./images/{n_batch}/{i}.png", img)
+      #   if i>6: break
+
+      # print(f"saving images for n_batch {n_batch}, done.")
+      # continue
+
+
       # print(batch["image"].shape)
       # assert batch['label'].shape == (1, local_batch_size, 1000) # the first dimension is the number of devices
       assert batch['label'].shape[-1] == NUM_CLASSES

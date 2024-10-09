@@ -248,11 +248,12 @@ def create_split(
     #   loader=loader,
     # )
     augmentations = get_augmentations(dataset_cfg)
-    transform_list = augmentations + [
-        # transforms.ToTensor(),
-        ToTensorIfNeeded(),
-        transforms.Normalize(mean=MEAN_RGB, std=STDDEV_RGB),
-    ]
+    # transform_list = augmentations + [
+    #     # transforms.ToTensor(),
+    #     ToTensorIfNeeded(),
+    #     transforms.Normalize(mean=MEAN_RGB, std=STDDEV_RGB),
+    # ]
+    transform_list = augmentations
     # TODO: whether we should keep the RandomResizedCrop and RandomHorizontalFlip
     ds = datasets.ImageFolder(
         os.path.join(dataset_cfg.root, split),
