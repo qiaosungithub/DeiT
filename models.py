@@ -13,6 +13,9 @@ from functools import partial
 import zhh.F as F
 import zhh.random as zr
 
+def special_linear(features,use_bias=True):
+    return nn.Dense(features, kernel_init=nn.initializers.truncated_normal(0.02), bias_init=nn.initializers.zeros, use_bias=use_bias)
+
 def sinous_embedding(l, dim):
     angles = 10000 ** (- 2 * jnp.arange(dim//2,dtype=jnp.float32) / dim)
     pos = jnp.arange(l,dtype=jnp.float32)
@@ -29,10 +32,10 @@ class Attention(nn.Module):
         assert self.dim % self.head == 0
         self.head_dim = self.attn_dim // self.head
 
-        self.Q = TorchLinear(in_features=self.dim, out_features=self.attn_dim, use_bias=False)
-        self.K = TorchLinear(in_features=self.dim, out_features=self.attn_dim, use_bias=False)
-        self.V = TorchLinear(in_features=self.dim, out_features=self.attn_dim, use_bias=False)
-        self.out_proj = TorchLinear(in_features=self.attn_dim, out_features=self.dim, use_bias=False)
+        self.Q = special_linear(self.attn_dim, use_bias=False)
+        self.K = special_linear(self.attn_dim, use_bias=False)
+        self.V = special_linear(self.attn_dim, use_bias=False)
+        self.out_proj = special_linear(self.attn_dim, use_bias=False)
 
     def __call__(self, x, context):
         q = self.Q(x).reshape(*x.shape[:2], self.head, self.head_dim)
@@ -58,21 +61,25 @@ class Layer(nn.Module):
         self.attn = Attention(self.head, self.dim, self.attn_dim)
         self.ln1 = nn.LayerNorm(use_bias=False, use_scale=True, scale_init=nn.initializers.ones)
         self.mlp = nn.Sequential([
-            TorchLinear(self.dim, self.linear_dim),
+            special_linear(self.linear_dim),
             nn.gelu,
-            TorchLinear(self.linear_dim, self.dim),
+            special_linear(self.dim)
         ])
         self.ln2 = nn.LayerNorm(use_bias=False, use_scale=True, scale_init=nn.initializers.ones)
+        self.learned_scale1 = self.param('learned_scale1', nn.initializers.constant(1e-4), (1,1,self.dim,))
+        self.learned_scale2 = self.param('learned_scale2', nn.initializers.constant(1e-4), (1,1,self.dim,))
 
     def __call__(self, x,rng, training=True):
         # print('In layer: training is ', training)
-        residual = x
-        c = self.ln1(x)
-        x = x + F.dropout(self.attn(c, c), rate=self.dropout_rate, training=training, rng=rng); rng = zr.next(rng)
-        x = x + self.attn(c, c)
-        x = x + F.dropout(self.mlp(self.ln2(x)), rate=self.dropout_rate, training=training, rng=rng); rng = zr.next(rng)
-        x = x + self.mlp(self.ln2(x))
-        return F.stochastic_depth((x-residual), self.stochastic_depth_rate, training, rng) + residual
+        xc = x
+        x = self.ln1(x)
+        x = F.dropout(self.attn(x, x), rate=self.dropout_rate, training=training, rng=rng); rng = zr.next(rng)
+        x = xc + F.stochastic_depth(x, self.stochastic_depth_rate, training, rng, mode='row') * self.learned_scale1; rng = zr.next(rng)
+
+        xc = x
+        x = F.dropout(self.mlp(self.ln2(x)), rate=self.dropout_rate, training=training, rng=rng); rng = zr.next(rng)
+        x = xc + F.stochastic_depth(x, self.stochastic_depth_rate, training, rng, mode='row') * self.learned_scale2; rng = zr.next(rng)
+        return x
 
 
 class ViT(nn.Module):
@@ -102,12 +109,13 @@ class ViT(nn.Module):
         num_patches = (image_size // patch_size) ** 2
 
         # modules
-        self.embedding = nn.Dense(embed_dim)
-        self.pos_emb = sinous_embedding(num_patches + 1, embed_dim)
-        self.cls = self.param('cls', nn.initializers.normal(1), (1, 1, embed_dim))
+        self.embedding = TorchLinear(self.channels * (patch_size ** 2), embed_dim)
+        # self.pos_emb = sinous_embedding(num_patches + 1, embed_dim)
+        self.pos_emb = self.param('pos_emb', nn.initializers.truncated_normal(0.02), (1, num_patches + 1, embed_dim))
+        self.cls = self.param('cls', nn.initializers.truncated_normal(0.02), (1, 1, embed_dim))
         self.layers = [Layer(heads, embed_dim, self.linear_dim, self.attn_dim, dropout_rate=self.dropout_rate,stochastic_depth_rate=self.stochastic_depth_rate) for _ in range(n_layers)]
         self.final_ln = nn.LayerNorm(use_scale=True, use_bias=False,scale_init=nn.initializers.ones)
-        self.fc = nn.Dense(num_classes, kernel_init=nn.initializers.zeros, bias_init=nn.initializers.zeros)
+        self.fc = special_linear(num_classes, use_bias=True)
 
     def __call__(self, x:jnp.ndarray, rng, train=True):
         # print('In model: training is ', training)

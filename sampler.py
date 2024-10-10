@@ -1,9 +1,21 @@
+# Copyright (c) 2015-present, Facebook, Inc.
+# All rights reserved.
+import torch
+import torch.distributed as dist
+import math
+
+
 class RASampler(torch.utils.data.Sampler):
     """Sampler that restricts data loading to a subset of the dataset for distributed,
     with repeated augmentation.
     It ensures that different each augmented version of a sample will be visible to a
     different process (GPU)
     Heavily based on torch.utils.data.DistributedSampler
+
+    comments by sqa:
+    num_replicas: number of devices
+    rank: device id
+    The total dataset is repeated by num_repeats times
     """
 
     def __init__(self, dataset, num_replicas=None, rank=None, shuffle=True, num_repeats: int = 3):
@@ -24,6 +36,7 @@ class RASampler(torch.utils.data.Sampler):
         self.epoch = 0
         self.num_samples = int(math.ceil(len(self.dataset) * self.num_repeats / self.num_replicas))
         self.total_size = self.num_samples * self.num_replicas
+        # num_selected_samples: number of samples selected for each device (don't know why 256)
         # self.num_selected_samples = int(math.ceil(len(self.dataset) / self.num_replicas))
         self.num_selected_samples = int(math.floor(len(self.dataset) // 256 * 256 / self.num_replicas))
         self.shuffle = shuffle
@@ -48,7 +61,7 @@ class RASampler(torch.utils.data.Sampler):
         indices = indices[self.rank:self.total_size:self.num_replicas]
         assert len(indices) == self.num_samples
 
-        return iter(indices[:self.num_selected_samples])
+        return iter(indices[:self.num_selected_samples]) # iter 把list转换成迭代器
 
     def __len__(self):
         return self.num_selected_samples

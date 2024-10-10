@@ -37,14 +37,14 @@ source ka.sh
 echo Running at $VM_NAME $ZONE
 
 STAGEDIR=/$DATA_ROOT/staging/$(whoami)/debug
-mkdir -p $STAGEDIR
+sudo mkdir -p $STAGEDIR
 sudo chmod 777 $STAGEDIR
 echo 'Staging files...'
-rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__
+sudo rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__
 echo 'Done staging.'
 
 LOGDIR=$STAGEDIR/log
-rm -rf $LOGDIR
+sudo rm -rf $LOGDIR
 sudo mkdir -p ${LOGDIR}
 sudo chmod 777 ${LOGDIR}
 echo 'Log dir: '$LOGDIR
@@ -71,7 +71,7 @@ which python
 which pip3
 python3 main.py \
     --workdir=${LOGDIR} --config=configs/${CONFIG}.py \
-    --config.dataset.root=${FAKE_DATA_ROOT} \
+    --config.dataset.root='/${DATA_ROOT}/data/imagenet' \
     --config.batch_size=${batch} \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
@@ -95,3 +95,5 @@ python3 main.py \
     --config.dataset.switch_prob=${switch_prob} \
     --config.dataset.repeated_aug=${repeated_aug} \
 " 2>&1 | tee -a $LOGDIR/output.log
+
+# --config.dataset.root=${FAKE_DATA_ROOT} \

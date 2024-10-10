@@ -119,20 +119,25 @@ def create_learning_rate_fn(
   first warmup (increase to base_learning_rate) for config.warmup_epochs
   then cosine decay to 0 for the rest of the epochs
   """
-  warmup_fn = optax.linear_schedule(
-      init_value=0.0,
-      end_value=base_learning_rate,
-      transition_steps=config.warmup_epochs * steps_per_epoch,
-  )
-  cosine_epochs = max(config.num_epochs - config.warmup_epochs, 1)
-  cosine_fn = optax.cosine_decay_schedule(
-      init_value=base_learning_rate, decay_steps=cosine_epochs * steps_per_epoch
-  )
-  schedule_fn = optax.join_schedules(
-      schedules=[warmup_fn, cosine_fn],
-      boundaries=[config.warmup_epochs * steps_per_epoch],
-  )
-  return schedule_fn
+  # warmup_fn = optax.linear_schedule(
+  #     init_value=0.0,
+  #     end_value=base_learning_rate,
+  #     transition_steps=config.warmup_epochs * steps_per_epoch,
+  # )
+  cosine_epochs = max((config.num_epochs-10) - config.warmup_epochs, 1)
+  # cosine_fn = optax.cosine_decay_schedule(
+  #     init_value=base_learning_rate, decay_steps=cosine_epochs * steps_per_epoch
+  # )
+  # schedule_fn = optax.join_schedules(
+  #     schedules=[warmup_fn, cosine_fn],
+  #     boundaries=[config.warmup_epochs * steps_per_epoch],
+  # )
+  # print('warmup_epochs:', config.warmup_epochs)
+  # print('cosine_epochs:', cosine_epochs)
+  # print('steps_per_epoch:', steps_per_epoch)
+  first_schedule = optax.schedules.warmup_cosine_decay_schedule(init_value=0.0, peak_value=base_learning_rate, warmup_steps=config.warmup_epochs*steps_per_epoch, decay_steps=(config.warmup_epochs + cosine_epochs)*steps_per_epoch, end_value=1e-5) 
+  second_schedule = optax.schedules.constant_schedule(value=1e-5)
+  return optax.join_schedules(schedules=[first_schedule, second_schedule], boundaries=[(config.warmup_epochs + cosine_epochs)*steps_per_epoch])
 
 
 def train_step(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):

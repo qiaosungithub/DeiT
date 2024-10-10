@@ -32,6 +32,7 @@ dropout_rate=0.0
 stochastic_depth_rate=0.1
 
 CONFIG=fake_data_benchmark
+# CONFIG=tpu
 source $CONDA_INIT_SH_PATH
 export JAX_PLATFORMS=cpu
 # remember to use your own conda environment

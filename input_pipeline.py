@@ -313,12 +313,17 @@ def create_split(
     # ]
     transform_list = augmentations
     # TODO: whether we should keep the RandomResizedCrop and RandomHorizontalFlip
-    ds = RepeatAugImageFolder(
+    # ds = RepeatAugImageFolder(
+    #     os.path.join(dataset_cfg.root, split),
+    #     transform=transforms.Compose(transform_list),
+    #     loader=loader,
+    #     repeated_aug=dataset_cfg.get('repeated_aug',1),
+    # )
+    ds = datasets.ImageFolder(
         os.path.join(dataset_cfg.root, split),
         transform=transforms.Compose(transform_list),
         loader=loader,
-        repeated_aug=dataset_cfg.get('repeated_aug',1),
-    )
+    ) # currently remove the repeated_aug
     logging.info(ds)
     sampler = DistributedSampler(
       ds,
