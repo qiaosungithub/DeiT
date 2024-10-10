@@ -2,6 +2,7 @@
 
 import ml_collections
 
+# sqa warning: this file may not work now, see fake_data_benchmark.py
 
 def get_config():
   """Get the default hyperparameter configuration."""

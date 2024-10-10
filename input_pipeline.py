@@ -17,6 +17,8 @@ import timm.data.transforms as timm_transforms
 from timm.data.mixup import Mixup
 from timm.data import create_transform
 
+from sampler import RASampler, get_rank
+
 IMAGE_SIZE = 224
 CROP_PADDING = 32
 MEAN_RGB = [0.485, 0.456, 0.406]
@@ -124,6 +126,7 @@ def get_augmentations(dataset_cfg):
   dataset_cfg.rand_augment: (str) if exist, the string of rand augment policy
   dataset_cfg.reprob: (float = 0.0) the probability of random erasing
   TODO: implement auto_augment
+  Note: although 'create_transform' will add two transforms at the start, this is done samely in the paper.
   """
   augmentations = []
   if dataset_cfg.use_rand_augment:
@@ -203,11 +206,11 @@ def apply_mixup_cutmix_batch(dataset_cfg, batch):
   # set Mixup; for Cutmix, just set cutmix_alpha > 0
   if dataset_cfg.use_mixup_cutmix:
     mixup_fn = Mixup(
-      mixup_alpha=dataset_cfg.get('mixup_alpha', 0.2),
-      cutmix_alpha=dataset_cfg.get('cutmix_alpha', 0.2),
+      mixup_alpha=dataset_cfg.get('mixup_alpha', 0.8),
+      cutmix_alpha=dataset_cfg.get('cutmix_alpha', 1.0),
       prob=dataset_cfg.get('mixup_prob', 1.0),
       mode=dataset_cfg.get('mixup_mode', 'batch'),
-      label_smoothing=dataset_cfg.get('label_smoothing', 0.0),
+      label_smoothing=dataset_cfg.get('label_smoothing', 0.1),
       switch_prob=dataset_cfg.get('switch_prob', 0.5),
       num_classes=1000,
     )
@@ -232,34 +235,34 @@ def apply_mixup_cutmix_batch(dataset_cfg, batch):
   # 返回处理后的 batch
   return inputs, targets
 
-class RepeatAugImageFolder(datasets.ImageFolder):
-  def __init__(self, root, transform=None, target_transform=None, loader=loader, repeated_aug=1):
-    super(RepeatAugImageFolder, self).__init__(root, transform=transform, target_transform=target_transform, loader=loader)
-    self.repeated_aug = repeated_aug
+# class RepeatAugImageFolder(datasets.ImageFolder):
+#   def __init__(self, root, transform=None, target_transform=None, loader=loader, repeated_aug=1):
+#     super(RepeatAugImageFolder, self).__init__(root, transform=transform, target_transform=target_transform, loader=loader)
+#     self.repeated_aug = repeated_aug
 
-  def __getitem__(self, index):
-    """
-    Args:
-      index (int): Index
-    Returns:
-      tuple: (image, target) where target is class_index of the target class.
-    """
-    path, target = self.samples[index]
-    sample = self.loader(path)
-    samples = []
-    targets = []
-    if self.transform is not None:
-      for _ in range(self.repeated_aug):
-        samples.append(self.transform(sample))
-    else:
-      samples = [sample] * self.repeated_aug
-    if self.target_transform is not None:
-      for _ in range(self.repeated_aug):
-        targets.append(self.target_transform(target))
-    else:
-      targets = [target] * self.repeated_aug
+#   def __getitem__(self, index):
+#     """
+#     Args:
+#       index (int): Index
+#     Returns:
+#       tuple: (image, target) where target is class_index of the target class.
+#     """
+#     path, target = self.samples[index]
+#     sample = self.loader(path)
+#     samples = []
+#     targets = []
+#     if self.transform is not None:
+#       for _ in range(self.repeated_aug):
+#         samples.append(self.transform(sample))
+#     else:
+#       samples = [sample] * self.repeated_aug
+#     if self.target_transform is not None:
+#       for _ in range(self.repeated_aug):
+#         targets.append(self.target_transform(target))
+#     else:
+#       targets = [target] * self.repeated_aug
 
-    return torch.stack(samples,dim=0), torch.tensor(targets,dtype=torch.long).reshape(-1)
+#     return torch.stack(samples,dim=0), torch.tensor(targets,dtype=torch.long).reshape(-1)
 
 # def repeat_aug_collate_fn(batch):
 #   print(batch)
@@ -325,12 +328,22 @@ def create_split(
         loader=loader,
     ) # currently remove the repeated_aug
     logging.info(ds)
-    sampler = DistributedSampler(
-      ds,
-      num_replicas=jax.process_count(),
-      rank=rank,
-      shuffle=True,
-    )
+    # sqa's copy from deit's sampler, which implements the RASampler
+    repeated_aug=dataset_cfg.get('repeated_aug',1)
+    if repeated_aug > 1:
+      sampler = RASampler(
+        ds, num_replicas=dataset_cfg.num_tpus, rank=rank, shuffle=True
+      )
+    else:
+      sampler = DistributedSampler(
+        ds, num_replicas=dataset_cfg.num_tpus, rank=rank, shuffle=True
+      )
+    # sampler = DistributedSampler(
+    #   ds,
+    #   num_replicas=jax.process_count(),
+    #   rank=rank,
+    #   shuffle=True,
+    # )
     it = DataLoader(
       ds, batch_size=batch_size, drop_last=True,
       worker_init_fn=partial(worker_init_fn, rank=rank),

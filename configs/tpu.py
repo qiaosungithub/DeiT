@@ -40,6 +40,9 @@ def get_config():
   config.dataset.mixup_mode = 'batch'
   config.dataset.label_smoothing = 0.0 # a regularization technique for training
   config.dataset.repeated_aug = 3
+  config.dataset.num_tpus = 32
+  # you can add these things but I don't want to:
+  # color_fitter: default 0.3
 
   return config
 
