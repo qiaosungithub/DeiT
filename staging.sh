@@ -9,7 +9,7 @@ commitid=`git show -s --format=%h`  # latest commit id; may not be exactly the s
 export STAGEDIR=/kmh-nfs-ssd-eu-mount/staging/$USER/${now}-${salt}-${commitid}-code
 
 echo 'Staging files...'
-rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__
+rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__ --exclude='*.png'
 echo 'Done staging.'
 
 chmod 777 $STAGEDIR

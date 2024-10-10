@@ -9,7 +9,7 @@ ep=10
 CONFIG=tpu
 model=ViT_debug
 
-# sqa
+# other hyperparameters
 
 wd=0.05
 label_smoothing=0.1
@@ -22,7 +22,7 @@ rand_augment=rand-m9-mstd0.5-inc1
 reprob=0.25
 
 use_mixup_cutmix=1
-# if use mixup / cutmix: (i currently do not know what is the paper's parameter)
+# if use mixup / cutmix:
 mixup_prob=1.0
 switch_prob=0.5
 mixup_alpha=0.8
@@ -30,6 +30,7 @@ cutmix_alpha=1.0
 repeated_aug=3
 dropout_rate=0.0
 stochastic_depth_rate=0.1
+num_tpus=32
 
 ############# No need to modify #############
 source ka.sh
@@ -40,7 +41,8 @@ STAGEDIR=/$DATA_ROOT/staging/$(whoami)/debug
 sudo mkdir -p $STAGEDIR
 sudo chmod 777 $STAGEDIR
 echo 'Staging files...'
-sudo rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__
+sudo rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__ --exclude='*.png'
+echo 'staging dir: '$STAGEDIR
 echo 'Done staging.'
 
 LOGDIR=$STAGEDIR/log
@@ -61,12 +63,13 @@ fi
 gcloud compute tpus tpu-vm ssh $VM_NAME --zone $ZONE \
     --worker=all --command "
 cd $STAGEDIR
+echo 'Current dir: '
+pwd
 if [ \"$USE_CONDA\" -eq 1 ]; then
     echo 'Using conda'
     source $CONDA_INIT_SH_PATH
     conda activate $CONDA_ENV
 fi
-echo Current dir: $(pwd)
 which python
 which pip3
 python3 main.py \
@@ -94,6 +97,7 @@ python3 main.py \
     --config.dataset.cutmix_alpha=${cutmix_alpha} \
     --config.dataset.switch_prob=${switch_prob} \
     --config.dataset.repeated_aug=${repeated_aug} \
+    --config.dataset.num_tpus=${num_tpus} \
 " 2>&1 | tee -a $LOGDIR/output.log
 
 # --config.dataset.root=${FAKE_DATA_ROOT} \

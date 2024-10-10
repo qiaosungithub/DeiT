@@ -13,11 +13,10 @@ from torchvision import datasets, transforms
 
 from absl import logging
 from functools import partial
-import timm.data.transforms as timm_transforms
 from timm.data.mixup import Mixup
 from timm.data import create_transform
 
-from sampler import RASampler, get_rank
+from sampler import RASampler
 
 IMAGE_SIZE = 224
 CROP_PADDING = 32

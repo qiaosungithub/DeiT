@@ -12,7 +12,7 @@ ep=110 # with repeat-aug, 100 epoch is equivalent to 300 epoch previously # add 
 CONFIG=tpu
 model=ViT_base
 
-# sqa
+# other hyperparameters
 
 wd=0.05
 label_smoothing=0.1
@@ -25,7 +25,7 @@ rand_augment=rand-m9-mstd0.5-inc1
 reprob=0.25
 
 use_mixup_cutmix=1
-# if use mixup / cutmix: (i currently do not know what is the paper's parameter)
+# if use mixup / cutmix:
 mixup_prob=1.0
 switch_prob=0.5
 mixup_alpha=0.8
@@ -33,6 +33,7 @@ cutmix_alpha=1.0
 repeated_aug=3
 dropout_rate=0.0
 stochastic_depth_rate=0.1
+num_tpus=32
 
 ############# No need to modify #############
 for i in {1..20}; do echo "Do you remember to use TMUX?"; done
@@ -74,7 +75,8 @@ if [ \"$USE_CONDA\" -eq 1 ]; then
     source $CONDA_INIT_SH_PATH
     conda activate $CONDA_ENV
 fi
-echo Current dir: $(pwd)
+echo 'Current dir: '
+pwd
 which python
 which pip3
 python3 main.py \
@@ -102,4 +104,5 @@ python3 main.py \
     --config.dataset.cutmix_alpha=${cutmix_alpha} \
     --config.dataset.switch_prob=${switch_prob} \
     --config.dataset.repeated_aug=${repeated_aug} \
+    --config.dataset.num_tpus=${num_tpus} \
 " 2>&1 | tee -a $LOGDIR/output.log

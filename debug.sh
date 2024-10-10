@@ -35,6 +35,13 @@ CONFIG=fake_data_benchmark
 # CONFIG=tpu
 source $CONDA_INIT_SH_PATH
 export JAX_PLATFORMS=cpu
+
+if [ "$JAX_PLATFORMS" = "cpu" ]; then
+    num_tpus=1
+else
+    num_tpus=8
+fi
+
 # remember to use your own conda environment
 conda activate $OWN_CONDA_ENV_NAME
 
@@ -66,3 +73,4 @@ python3 main.py \
     --config.dataset.cutmix_alpha=${cutmix_alpha} \
     --config.dataset.switch_prob=${switch_prob} \
     --config.dataset.repeated_aug=${repeated_aug} \
+    --config.dataset.num_tpus=${num_tpus} \
