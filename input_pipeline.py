@@ -130,7 +130,9 @@ def get_augmentations(dataset_cfg):
     augmentations.append(create_transform(
       input_size=IMAGE_SIZE,
       is_training=True,
+      color_jitter=dataset_cfg.get('color_jitter', 0.3),
       auto_augment=dataset_cfg.get('rand_augment', 'rand-m9-mstd0.5-inc1'),
+      interpolation='bicubic',
       re_prob=dataset_cfg.get('reprob', 0.0),
       re_mode="pixel",
       re_count=1,
@@ -340,10 +342,12 @@ def create_split(
     # it = apply_mixup_cutmix(dataset_cfg, it)
 
   elif split == 'val':
+    size = int(IMAGE_SIZE / dataset_cfg.get('eval_crop_ratio', 0.875))
     ds = datasets.ImageFolder(
       os.path.join(dataset_cfg.root, split),
       transform=transforms.Compose([
-        transforms.Resize(IMAGE_SIZE + CROP_PADDING, interpolation=3),
+        # transforms.Resize(IMAGE_SIZE + CROP_PADDING, interpolation=3),
+        transforms.Resize(size, interpolation=3), # to maintain same ratio w.r.t. 224 images
         transforms.CenterCrop(IMAGE_SIZE),
         transforms.ToTensor(),
         transforms.Normalize(mean=MEAN_RGB, std=STDDEV_RGB),
