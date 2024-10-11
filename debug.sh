@@ -49,7 +49,7 @@ echo "start running main"
 
 python3 main.py \
     --workdir=${LOGDIR} --config=configs/${CONFIG}.py \
-    --config.dataset.root=${EU_IMAGENET_FAKE} \
+    --config.dataset.root='/kmh-nfs-ssd-eu-mount/data/imagenet' \
     --config.batch_size=${batch} \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \

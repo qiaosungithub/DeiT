@@ -331,11 +331,11 @@ def create_split(
     repeated_aug=dataset_cfg.get('repeated_aug',1)
     if repeated_aug > 1:
       sampler = RASampler(
-        ds, num_replicas=dataset_cfg.num_tpus, rank=rank, shuffle=True
+        ds, num_replicas=jax.process_count(), rank=rank, shuffle=True
       )
     else:
       sampler = DistributedSampler(
-        ds, num_replicas=dataset_cfg.num_tpus, rank=rank, shuffle=True
+        ds, num_replicas=jax.process_count(), rank=rank, shuffle=True
       )
     # sampler = DistributedSampler(
     #   ds,
@@ -354,6 +354,8 @@ def create_split(
       # collate_fn=repeat_aug_collate_fn,
     )
     steps_per_epoch = len(it)
+    # print("steps_per_epoch: ", steps_per_epoch)
+    # assert False
 
     # Apply Mixup, CutMix
     # it = apply_mixup_cutmix(dataset_cfg, it)
