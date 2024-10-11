@@ -39,6 +39,8 @@ class RASampler(torch.utils.data.Sampler):
         # num_selected_samples: number of samples selected for each device (don't know why 256)
         # self.num_selected_samples = int(math.ceil(len(self.dataset) / self.num_replicas))
         self.num_selected_samples = int(math.floor(len(self.dataset) // 256 * 256 / self.num_replicas))
+        # print("num_selected_samples: ",self.num_selected_samples)
+        # exit()
         self.shuffle = shuffle
 
     def __iter__(self):
@@ -51,7 +53,10 @@ class RASampler(torch.utils.data.Sampler):
             indices = torch.arange(start=0, end=len(self.dataset))
 
         # add extra samples to make it evenly divisible
+        # print("indices: ",indices.shape)
         indices = torch.repeat_interleave(indices, repeats=self.num_repeats, dim=0).tolist()
+        # print("indices: ",len(indices))
+        # assert False
         padding_size: int = self.total_size - len(indices)
         if padding_size > 0:
             indices += indices[:padding_size]

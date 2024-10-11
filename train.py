@@ -473,6 +473,10 @@ def train_and_evaluate(
       # print(batch[0].shape)
       batch = prepare_batch_data_sqa(batch)
 
+      # print("batch['image'].shape:", batch['image'].shape)
+      # print("batch['label'].shape:", batch['label'].shape)
+      # assert False
+
       
       # # here is code for us to visualize the images
       # import matplotlib.pyplot as plt
@@ -491,7 +495,7 @@ def train_and_evaluate(
       #   img = batch["image"][0][i]
       #   img = (img - np.min(img)) / (np.max(img) - np.min(img))
       #   plt.imsave(f"./images/{n_batch}/{i}.png", img)
-      #   # if i>6: break
+      #   if i>6: break
 
       # print(f"saving images for n_batch {n_batch}, done.")
       # if n_batch > 1:

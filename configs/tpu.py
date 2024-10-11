@@ -31,7 +31,6 @@ def get_config():
   config.dataset.reprob = 0.0
 
   # mixup & cutmix
-  # i have not figured out how to set the alphas, and whether i set the probs correct or not
   config.dataset.use_mixup_cutmix = False
   config.dataset.mixup_alpha = 0.2
   config.dataset.cutmix_alpha = 0.2

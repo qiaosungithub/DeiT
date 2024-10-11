@@ -22,8 +22,8 @@ def get_config():
 
   # configs for data transforms
   # we can use `get()` for config.dataset to avoid KeyError
-  if config.dataset.get('root'):
-    print(f"Dataset root is set to: {config.dataset.get('root')}")
+  # if config.dataset.get('root'):
+  #   print(f"Dataset root is set to: {config.dataset.get('root')}")
   
   # rand_augment:
   config.dataset.use_rand_augment = False
@@ -31,7 +31,6 @@ def get_config():
   config.dataset.reprob = 0.0
 
   # mixup & cutmix
-  # i have not figured out how to set the alphas, and whether i set the probs correct or not
   config.dataset.use_mixup_cutmix = False
   config.dataset.mixup_alpha = 0.2
   config.dataset.cutmix_alpha = 0.2

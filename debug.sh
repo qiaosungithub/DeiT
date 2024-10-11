@@ -50,7 +50,6 @@ echo "start running main"
 python3 main.py \
     --workdir=${LOGDIR} --config=configs/${CONFIG}.py \
     --config.dataset.root=${EU_IMAGENET_FAKE} \
-    --config.debug=True \
     --config.batch_size=${batch} \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
@@ -73,4 +72,6 @@ python3 main.py \
     --config.dataset.cutmix_alpha=${cutmix_alpha} \
     --config.dataset.switch_prob=${switch_prob} \
     --config.dataset.repeated_aug=${repeated_aug} \
-    --config.dataset.num_tpus=${num_tpus} \
+    --config.dataset.num_tpus=${num_tpus} 
+
+# note that the end of the final row should not contain a '\', or it will cause an error "Too many command-line arguments"
