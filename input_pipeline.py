@@ -331,7 +331,7 @@ def create_split(
     repeated_aug=dataset_cfg.get('repeated_aug',1)
     if repeated_aug > 1:
       sampler = RASampler(
-        ds, num_replicas=jax.process_count(), rank=rank, shuffle=True
+        ds, num_replicas=jax.process_count(), rank=rank, shuffle=True, num_repeats=repeated_aug
       )
     else:
       sampler = DistributedSampler(

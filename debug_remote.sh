@@ -99,5 +99,3 @@ python3 main.py \
     --config.dataset.repeated_aug=${repeated_aug} \
     --config.dataset.num_tpus=${num_tpus} \
 " 2>&1 | tee -a $LOGDIR/output.log
-
-# --config.dataset.root=${FAKE_DATA_ROOT} \
