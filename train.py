@@ -151,16 +151,16 @@ def train_step(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
   def loss_fn(params):
     """loss function used for training."""
     logits, new_model_state = state.apply_fn(
-        {'params': params, 'batch_stats': state.batch_stats},
-        batch['image'],
-        mutable=['batch_stats'],
-        rngs=dict(dropout=rng_dropout),
+      {'params': params, 'batch_stats': state.batch_stats},
+      batch['image'],
+      mutable=['batch_stats'],
+      rngs=dict(dropout=rng_dropout),
     )
     loss = cross_entropy_loss(logits, batch['label'], label_smoothing=label_smoothing)
     weight_penalty_params = jax.tree_util.tree_leaves(params)
     weight_decay = 0.0001
     weight_l2 = sum(
-        jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1
+      jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1
     )
     weight_penalty = weight_decay * 0.5 * weight_l2
     loss = loss + weight_penalty
@@ -172,7 +172,7 @@ def train_step(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
 
   if dynamic_scale:
     grad_fn = dynamic_scale.value_and_grad(
-        loss_fn, has_aux=True, axis_name='batch'
+      loss_fn, has_aux=True, axis_name='batch'
     )
     dynamic_scale, is_fin, aux, grads = grad_fn(state.params)
     # dynamic loss takes care of averaging gradients across replicas
@@ -192,15 +192,15 @@ def train_step(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
     # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
     # params should be restored (= skip this step).
     new_state = new_state.replace(
-        opt_state=jax.tree_util.tree_map(
-            functools.partial(jnp.where, is_fin),
-            new_state.opt_state,
-            state.opt_state,
-        ),
-        params=jax.tree_util.tree_map(
-            functools.partial(jnp.where, is_fin), new_state.params, state.params
-        ),
-        dynamic_scale=dynamic_scale,
+      opt_state=jax.tree_util.tree_map(
+        functools.partial(jnp.where, is_fin),
+        new_state.opt_state,
+        state.opt_state,
+      ),
+      params=jax.tree_util.tree_map(
+        functools.partial(jnp.where, is_fin), new_state.params, state.params
+      ),
+      dynamic_scale=dynamic_scale,
     )
     metrics['scale'] = dynamic_scale.scale
 
@@ -224,17 +224,17 @@ def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1)
   def loss_fn(params):
     """loss function used for training."""
     logits, new_model_state = state.apply_fn(
-        {'params': params, 'batch_stats': state.batch_stats},
-        batch['image'],
-        mutable=['batch_stats'],
-        # rngs=dict(dropout=rng_dropout),
-        rng=rng_dropout,
+      {'params': params, 'batch_stats': state.batch_stats},
+      batch['image'],
+      mutable=['batch_stats'],
+      # rngs=dict(dropout=rng_dropout),
+      rng=rng_dropout,
     )
     loss = categorical_cross_entropy_loss(logits, batch['label'])
     weight_penalty_params = jax.tree_util.tree_leaves(params)
     weight_decay = 0.0001
     weight_l2 = sum(
-        jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1
+      jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1
     )
     weight_penalty = weight_decay * 0.5 * weight_l2
     loss = loss + weight_penalty
@@ -246,7 +246,7 @@ def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1)
 
   if dynamic_scale:
     grad_fn = dynamic_scale.value_and_grad(
-        loss_fn, has_aux=True, axis_name='batch'
+      loss_fn, has_aux=True, axis_name='batch'
     )
     dynamic_scale, is_fin, aux, grads = grad_fn(state.params)
     # dynamic loss takes care of averaging gradients across replicas
@@ -260,21 +260,21 @@ def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1)
   metrics['lr'] = lr
 
   new_state = state.apply_gradients(
-      grads=grads, batch_stats=new_model_state['batch_stats']
+    grads=grads, batch_stats=new_model_state['batch_stats']
   )
   if dynamic_scale:
     # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
     # params should be restored (= skip this step).
     new_state = new_state.replace(
-        opt_state=jax.tree_util.tree_map(
-            functools.partial(jnp.where, is_fin),
-            new_state.opt_state,
-            state.opt_state,
-        ),
-        params=jax.tree_util.tree_map(
-            functools.partial(jnp.where, is_fin), new_state.params, state.params
-        ),
-        dynamic_scale=dynamic_scale,
+      opt_state=jax.tree_util.tree_map(
+        functools.partial(jnp.where, is_fin),
+        new_state.opt_state,
+        state.opt_state,
+      ),
+      params=jax.tree_util.tree_map(
+        functools.partial(jnp.where, is_fin), new_state.params, state.params
+      ),
+      dynamic_scale=dynamic_scale,
     )
     metrics['scale'] = dynamic_scale.scale
 
@@ -344,28 +344,28 @@ def create_train_state(
     if config.grad_norm_clip != "None":
       print("Warning from sqa: grad norm clipping is not supported in SGD")
     tx = optax.sgd(
-        learning_rate=learning_rate_fn,
-        momentum=config.momentum,
-        nesterov=True,
+      learning_rate=learning_rate_fn,
+      momentum=config.momentum,
+      nesterov=True,
     )
   elif config.optimizer == 'adamw':
     grad_norm_clip = None if config.grad_norm_clip == "None" else config.grad_norm_clip
     tx = optax.adamw(
-        learning_rate=learning_rate_fn,
-        b1=0.9,
-        b2=0.999,
-        eps=1e-8,
-        weight_decay=config.weight_decay,
-        # grad_norm_clip=grad_norm_clip, # None if no clipping
+      learning_rate=learning_rate_fn,
+      b1=0.9,
+      b2=0.999,
+      eps=1e-8,
+      weight_decay=config.weight_decay,
+      # grad_norm_clip=grad_norm_clip, # None if no clipping
     )
   else:
     raise ValueError(f'Unknown optimizer: {config.optimizer}, choose from "sgd" or "adamw"')
   state = TrainState.create(
-      apply_fn=model.apply,
-      params=params,
-      tx=tx,
-      batch_stats=batch_stats,
-      dynamic_scale=dynamic_scale,
+    apply_fn=model.apply,
+    params=params,
+    tx=tx,
+    batch_stats=batch_stats,
+    dynamic_scale=dynamic_scale,
   )
   return state
 
@@ -427,7 +427,7 @@ def train_and_evaluate(
 
   model_cls = getattr(models, config.model)
   model = create_model(
-      model_cls=model_cls, half_precision=config.half_precision,
+    model_cls=model_cls, half_precision=config.half_precision,
     dropout_rate=config.dropout_rate,
     stochastic_depth_rate=config.stochastic_depth_rate,
   )
@@ -451,8 +451,8 @@ def train_and_evaluate(
   #     axis_name='batch',
   # )
   p_train_step = jax.pmap(
-      functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn, label_smoothing=0.0),
-      axis_name='batch',
+    functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn, label_smoothing=0.0),
+    axis_name='batch',
   )
   p_eval_step = jax.pmap(eval_step, axis_name='batch')
 
@@ -525,10 +525,10 @@ def train_and_evaluate(
           train_metrics = common_utils.get_metrics(train_metrics)
           train_metrics.pop('labels')  # used in val only
           summary = {
-              f'train_{k}': v
-              for k, v in jax.tree_util.tree_map(
-                  lambda x: float(x.mean()), train_metrics
-              ).items()
+            f'train_{k}': v
+            for k, v in jax.tree_util.tree_map(
+                lambda x: float(x.mean()), train_metrics
+            ).items()
           }
           summary['steps_per_second'] = config.log_per_step / (time.time() - train_metrics_last_t)
           # summary['seconds_per_step'] = (time.time() - train_metrics_last_t) / config.log_per_step
@@ -590,10 +590,10 @@ def train_and_evaluate(
 
       summary = jax.tree_util.tree_map(lambda x: float(x.mean()), eval_metrics)
       logging.info(
-          'eval epoch: %d, loss: %.6f, accuracy: %.6f',
-          epoch,
-          summary['loss'],
-          summary['accuracy'] * 100,
+        'eval epoch: %d, loss: %.6f, accuracy: %.6f',
+        epoch,
+        summary['loss'],
+        summary['accuracy'] * 100,
       )
       summary = {f'eval_{key}': val for key, val in summary.items()}
       summary["ep"] = ep
