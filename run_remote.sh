@@ -56,6 +56,7 @@ LOGDIR=/$DATA_ROOT/logs/$USER/$JOBNAME
 sudo mkdir -p ${LOGDIR}
 sudo chmod 777 ${LOGDIR}
 echo 'Log dir: '$LOGDIR
+echo 'Staging dir: '$STAGEDIR
 
 if [[ $USE_CONDA == 1 ]]; then
     CONDA_PATH=$(which conda)
