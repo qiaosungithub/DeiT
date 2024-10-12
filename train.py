@@ -466,7 +466,14 @@ def train_and_evaluate(
     if jax.process_count() > 1:
       train_loader.sampler.set_epoch(epoch)
     logging.info('epoch {}...'.format(epoch))
+    # print("train_loader: " , train_loader)
+    # print("train_loader.sampler: ", train_loader.sampler)
+    # print("length of train_loader: ", len(train_loader))
+    # print("length of train_loader.sampler: ", len(train_loader.sampler))
+    # print("length of train_loader.dataset: ", len(train_loader.dataset))
     for n_batch, batch in enumerate(train_loader):
+      # print("number of batch:", n_batch)
+      # print("shape of the batch images:", batch[0].shape)
       batch = pre_process_batch(batch)
       batch = apply_mixup_cutmix_batch(config.dataset, batch)
       step = epoch * steps_per_epoch + n_batch

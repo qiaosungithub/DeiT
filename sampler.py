@@ -38,7 +38,7 @@ class RASampler(torch.utils.data.Sampler):
         self.total_size = self.num_samples * self.num_replicas
         # num_selected_samples: number of samples selected for each device (don't know why 256)
         # self.num_selected_samples = int(math.ceil(len(self.dataset) / self.num_replicas))
-        self.num_selected_samples = int(math.floor(len(self.dataset) // 256 * 256 / self.num_replicas))
+        self.num_selected_samples = int(math.floor(len(self.dataset) // 256 * 256 / self.num_replicas)) * self.num_repeats
         # print("num_selected_samples: ",self.num_selected_samples)
         # exit()
         self.shuffle = shuffle
@@ -65,6 +65,10 @@ class RASampler(torch.utils.data.Sampler):
         # subsample
         indices = indices[self.rank:self.total_size:self.num_replicas]
         assert len(indices) == self.num_samples
+
+        # print("length of indices: ",len(indices))
+        # print("final length: ",self.num_selected_samples)
+        # assert False
 
         return iter(indices[:self.num_selected_samples]) # iter 把list转换成迭代器
 
