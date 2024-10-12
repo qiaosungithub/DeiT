@@ -329,6 +329,7 @@ def create_split(
     logging.info(ds)
     # sqa's copy from deit's sampler, which implements the RASampler
     repeated_aug=dataset_cfg.get('repeated_aug',1)
+    # print("process count: ", jax.process_count())
     if repeated_aug > 1:
       sampler = RASampler(
         ds, num_replicas=jax.process_count(), rank=rank, shuffle=True, num_repeats=repeated_aug

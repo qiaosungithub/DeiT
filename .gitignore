@@ -13,3 +13,7 @@ config.sh
 issues.md
 1.sh
 out.txt
+
+SOTA/
+tmp/
+zhh_diaoda/

@@ -493,19 +493,21 @@ def train_and_evaluate(
       # # print(batch["label"].shape)
 
       # # save batch["image"] to ./images/{epoch}/i.png
-      # if os.path.exists(f"./images/{n_batch}") == False:
-      #   os.makedirs(f"./images/{n_batch}")
+      # rank = jax.process_index()
+
+      # if os.path.exists(f"/kmh-nfs-us-mount/staging/sqa/images/{n_batch}/{rank}") == False:
+      #   os.makedirs(f"/kmh-nfs-us-mount/staging/sqa/images/{n_batch}/{rank}")
       # for i in range(batch["image"][0].shape[0]):
       #   # print the max and min of the image
       #   # print(f"max: {np.max(batch['image'][0][i])}, min: {np.min(batch['image'][0][i])}")
       #   # use the max and min to normalize the image to [0, 1]
       #   img = batch["image"][0][i]
       #   img = (img - np.min(img)) / (np.max(img) - np.min(img))
-      #   plt.imsave(f"./images/{n_batch}/{i}.png", img)
-      #   if i>6: break
+      #   plt.imsave(f"/kmh-nfs-us-mount/staging/sqa/images/{n_batch}/{rank}/{i}.png", img)
+      #   # if i>6: break
 
       # print(f"saving images for n_batch {n_batch}, done.")
-      # if n_batch > 1:
+      # if n_batch > 0:
       #   exit(114514)
       # continue
 

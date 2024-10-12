@@ -17,6 +17,7 @@ pip3 install torch==2.2.2
 pip3 install torchvision==0.17.2
 pip3 install orbax-checkpoint==0.4.4
 pip3 install chex==0.1.86
+pip3 install matpotlib==3.9.2
 pip3 install jax[tpu]==0.4.25 -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 
 "

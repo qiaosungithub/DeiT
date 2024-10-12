@@ -8,7 +8,7 @@ TASKNAME=DeiT
 ############# JOB CONFIG #############
 batch=1024
 lr=0.0005
-ep=110 # with repeat-aug, 100 epoch is equivalent to 300 epoch previously # add 10 more epochs for colling down
+ep=330 # with repeat-aug, 100 epoch is equivalent to 300 epoch previously # add 10 more epochs for colling down
 CONFIG=tpu
 model=ViT_base
 
