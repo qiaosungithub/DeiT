@@ -10,6 +10,7 @@ export STAGEDIR=/kmh-nfs-ssd-eu-mount/staging/$USER/${now}-${salt}-${commitid}-c
 
 echo 'Staging files...'
 rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__ --exclude='*.png'
+cp -r /kmh-nfs-ssd-eu-mount/code/hanhong/MyFile/research_utils/Jax/zhh $STAGEDIR
 echo 'Done staging.'
 
 chmod 777 $STAGEDIR
