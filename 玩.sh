@@ -2,7 +2,7 @@ source ka.sh # import VM_NAME, ZONE
 
 gcloud compute tpus tpu-vm ssh $VM_NAME --zone $ZONE \
 --worker=all --command "
-pip3 list | grep matplotlib
+sudo rm /tmp/libtpu_lockfile
 echo 牛魔王
 "
 
