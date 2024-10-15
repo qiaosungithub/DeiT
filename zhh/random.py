@@ -66,6 +66,13 @@ def randn(*size, rng=None):
     size = get_size_from(size)
     return _jax_random.normal(_default_key(rng), size)
 
+def uniform(*size, minval, maxval, rng=None):
+    """Generate a Uniform(0,1) tensor, with shape `size`."""
+    assert minval < maxval, 'The `minval` must be less than `maxval`.'
+    size = get_size_from(size)
+    x = _jax_random.uniform(_default_key(rng), size)
+    return x * (maxval - minval) + minval
+
 def rand(*size, rng=None):
     """Generate a Uniform(0,1) tensor, with shape `size`."""
     size = get_size_from(size)

@@ -244,3 +244,32 @@ class TorchLinear(_Module):
     
     def __call__(self, x):
         return self._model(x)
+
+class EmbedLinear(_Module):
+    in_features: int
+    out_features: int
+    use_bias: bool = True
+    dtype = None
+    param_dtype = jnp.float32
+    precision = None
+    kernel_init = None
+    bias_init = None
+    dot_general = None
+    dot_general_cls = None
+
+    def setup(self):
+        assert self.bias_init is None, 'The bias_init is not supported in EmbedLinear'
+        self._model = _Dense(
+            features=self.out_features,
+            use_bias=self.use_bias,
+            dtype=self.dtype,
+            param_dtype=self.param_dtype,
+            precision=self.precision,
+            kernel_init=torch_bias_initializer(self.in_features),
+            bias_init=torch_bias_initializer(self.in_features),
+            dot_general=self.dot_general,
+            dot_general_cls=self.dot_general_cls
+        )
+    
+    def __call__(self, x):
+        return self._model(x)
