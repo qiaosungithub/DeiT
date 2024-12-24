@@ -140,71 +140,71 @@ def create_learning_rate_fn(
   return optax.join_schedules(schedules=[first_schedule, second_schedule], boundaries=[(config.warmup_epochs + cosine_epochs)*steps_per_epoch])
 
 
-def train_step(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
-  """Perform a single training step."""
+# def train_step(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
+#   """Perform a single training step."""
 
-  # ResNet has no dropout; but maintain rng_dropout for future usage
-  rng_step = random.fold_in(rng_init, state.step)
-  rng_device = random.fold_in(rng_step, lax.axis_index(axis_name='batch'))
-  rng_dropout, _ = random.split(rng_device)
+#   # ResNet has no dropout; but maintain rng_dropout for future usage
+#   rng_step = random.fold_in(rng_init, state.step)
+#   rng_device = random.fold_in(rng_step, lax.axis_index(axis_name='batch'))
+#   rng_dropout, _ = random.split(rng_device)
 
-  def loss_fn(params):
-    """loss function used for training."""
-    logits, new_model_state = state.apply_fn(
-      {'params': params, 'batch_stats': state.batch_stats},
-      batch['image'],
-      mutable=['batch_stats'],
-      rngs=dict(dropout=rng_dropout),
-    )
-    loss = cross_entropy_loss(logits, batch['label'], label_smoothing=label_smoothing)
-    weight_penalty_params = jax.tree_util.tree_leaves(params)
-    weight_decay = 0.0001
-    weight_l2 = sum(
-      jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1
-    )
-    weight_penalty = weight_decay * 0.5 * weight_l2
-    loss = loss + weight_penalty
-    return loss, (new_model_state, logits)
+#   def loss_fn(params):
+#     """loss function used for training."""
+#     logits, new_model_state = state.apply_fn(
+#         {'params': params, 'batch_stats': state.batch_stats},
+#         batch['image'],
+#         mutable=['batch_stats'],
+#         rngs=dict(dropout=rng_dropout),
+#     )
+#     loss = cross_entropy_loss(logits, batch['label'], label_smoothing=label_smoothing)
+#     # weight_penalty_params = jax.tree_util.tree_leaves(params)
+#     # weight_decay = 0.0001
+#     # weight_l2 = sum(
+#     #     jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1
+#     # )
+#     # weight_penalty = weight_decay * 0.5 * weight_l2
+#     # loss = loss + weight_penalty
+#     return loss, (new_model_state, logits)
 
-  step = state.step
-  dynamic_scale = state.dynamic_scale
-  lr = learning_rate_fn(step)
+#   step = state.step
+#   dynamic_scale = state.dynamic_scale
+#   lr = learning_rate_fn(step)
 
-  if dynamic_scale:
-    grad_fn = dynamic_scale.value_and_grad(
-      loss_fn, has_aux=True, axis_name='batch'
-    )
-    dynamic_scale, is_fin, aux, grads = grad_fn(state.params)
-    # dynamic loss takes care of averaging gradients across replicas
-  else:
-    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-    aux, grads = grad_fn(state.params)
-    # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
-    grads = lax.pmean(grads, axis_name='batch')
-  new_model_state, logits = aux[1]
-  metrics = compute_metrics(logits, batch['label'])
-  metrics['lr'] = lr
+#   if dynamic_scale:
+#     grad_fn = dynamic_scale.value_and_grad(
+#         loss_fn, has_aux=True, axis_name='batch'
+#     )
+#     dynamic_scale, is_fin, aux, grads = grad_fn(state.params)
+#     # dynamic loss takes care of averaging gradients across replicas
+#   else:
+#     grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+#     aux, grads = grad_fn(state.params)
+#     # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
+#     grads = lax.pmean(grads, axis_name='batch')
+#   new_model_state, logits = aux[1]
+#   metrics = compute_metrics(logits, batch['label'])
+#   metrics['lr'] = lr
 
-  new_state = state.apply_gradients(
-      grads=grads, batch_stats=new_model_state['batch_stats']
-  )
-  if dynamic_scale:
-    # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
-    # params should be restored (= skip this step).
-    new_state = new_state.replace(
-      opt_state=jax.tree_util.tree_map(
-        functools.partial(jnp.where, is_fin),
-        new_state.opt_state,
-        state.opt_state,
-      ),
-      params=jax.tree_util.tree_map(
-        functools.partial(jnp.where, is_fin), new_state.params, state.params
-      ),
-      dynamic_scale=dynamic_scale,
-    )
-    metrics['scale'] = dynamic_scale.scale
+#   new_state = state.apply_gradients(
+#       grads=grads, batch_stats=new_model_state['batch_stats']
+#   )
+#   if dynamic_scale:
+#     # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
+#     # params should be restored (= skip this step).
+#     new_state = new_state.replace(
+#         opt_state=jax.tree_util.tree_map(
+#             functools.partial(jnp.where, is_fin),
+#             new_state.opt_state,
+#             state.opt_state,
+#         ),
+#         params=jax.tree_util.tree_map(
+#             functools.partial(jnp.where, is_fin), new_state.params, state.params
+#         ),
+#         dynamic_scale=dynamic_scale,
+#     )
+#     metrics['scale'] = dynamic_scale.scale
 
-  return new_state, metrics
+#   return new_state, metrics
 
 def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
   """Perform a single training step."""
@@ -231,13 +231,6 @@ def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1)
       rng=rng_dropout,
     )
     loss = categorical_cross_entropy_loss(logits, batch['label'])
-    weight_penalty_params = jax.tree_util.tree_leaves(params)
-    weight_decay = 0.0001
-    weight_l2 = sum(
-      jnp.sum(x**2) for x in weight_penalty_params if x.ndim > 1
-    )
-    weight_penalty = weight_decay * 0.5 * weight_l2
-    loss = loss + weight_penalty
     return loss, (new_model_state, logits)
 
   step = state.step
@@ -383,7 +376,6 @@ def train_and_evaluate(
     Final TrainState.
   """
 
-  # print("position 0")
   writer = metric_writers.create_default_writer(
       logdir=workdir, just_logging=jax.process_index() != 0
   )

@@ -1,15 +1,15 @@
 # Stage code and run job in a remote TPU VM
-
+source ka.sh
 # ------------------------------------------------
 # Copy all code files to staging
 # ------------------------------------------------
 now=`date '+%y%m%d%H%M%S'`
 salt=`head /dev/urandom | tr -dc a-z0-9 | head -c6`
 commitid=`git show -s --format=%h`  # latest commit id; may not be exactly the same as the commit
-export STAGEDIR=/kmh-nfs-ssd-eu-mount/staging/$USER/${now}-${salt}-${commitid}-code
+export STAGEDIR=/$DATA_ROOT/staging/$USER/${now}-${salt}-${commitid}-code
 
 echo 'Staging files...'
-rsync -a . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__ --exclude='*.png'
+rsync -av . $STAGEDIR --exclude=tmp --exclude=.git --exclude=__pycache__ --exclude="*.png"
 cp -r /kmh-nfs-ssd-eu-mount/code/hanhong/MyFile/research_utils/Jax/zhh $STAGEDIR
 echo 'Done staging.'
 
