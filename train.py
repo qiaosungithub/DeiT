@@ -172,6 +172,27 @@ def eval_step(state, batch):
   return compute_metrics(logits, batch['label'])
 
 
+def eval_step_agg(state, batch):
+  variables = {'params': state.params, 'batch_stats': state.batch_stats}
+  logits = state.apply_fn(variables, batch['image'], train=False, mutable=False, rng=jax.random.PRNGKey(0))
+
+  labels = batch['label']
+  if labels.shape[-1] != NUM_CLASSES:
+    labels = jax.nn.one_hot(labels, NUM_CLASSES)
+  labels = labels.astype(jnp.float32)
+
+  per_example_loss = optax.softmax_cross_entropy(logits=logits, labels=labels)
+  per_example_acc = (jnp.argmax(logits, -1) == jnp.argmax(labels, -1)).astype(jnp.float32)
+  valid = (labels[..., 0] >= 0).astype(jnp.float32)
+
+  stats = {
+    'loss_sum': jnp.sum(per_example_loss * valid),
+    'acc_sum': jnp.sum(per_example_acc * valid),
+    'n_valid': jnp.sum(valid),
+  }
+  return lax.psum(stats, axis_name='batch')
+
+
 class TrainState(train_state.TrainState):
   batch_stats: Any
 
@@ -185,7 +206,9 @@ def sync_batch_stats(state):
   """Sync the batch statistics across replicas."""
   # Each device has its own version of the running average batch statistics and
   # we sync them before evaluation.
-  if hasattr(state, 'batch_stats'):
+  if not hasattr(state, 'batch_stats'):
+    return state
+  if not state.batch_stats:
     return state
   return state.replace(batch_stats=cross_replica_mean(state.batch_stats))
 
@@ -275,7 +298,6 @@ def train_and_evaluate(
     config.dataset,
     local_batch_size,
     split='train',
-    # split='val' if config.debug else 'train',
   )
   eval_loader, steps_per_eval = input_pipeline.create_split(
     config.dataset,
@@ -284,9 +306,6 @@ def train_and_evaluate(
   )
   log_for_0('steps_per_epoch: {}'.format(steps_per_epoch))
   log_for_0('steps_per_eval: {}'.format(steps_per_eval))
-
-  if config.steps_per_eval != -1:
-    steps_per_eval = config.steps_per_eval
 
   base_learning_rate = config.learning_rate * config.batch_size / 512.0 # note that here the input config.learning_rate is 0.0005 in the paper
 
@@ -315,15 +334,17 @@ def train_and_evaluate(
     axis_name='batch',
     donate_argnums=(0, 1),
   )
-  p_eval_step = jax.pmap(eval_step, axis_name='batch')
+  p_eval_step = jax.pmap(eval_step_agg, axis_name='batch')
 
   train_metrics = []
   train_metrics_last_t = time.time()
+
   log_for_0('Initial compilation, this might take some minutes...')
   for epoch in range(epoch_offset, config.num_epochs):
     if jax.process_count() > 1:
       train_loader.sampler.set_epoch(epoch)
     log_for_0('epoch {}...'.format(epoch))
+
     for n_batch, batch in enumerate(train_loader):
       batch = pre_process_batch(batch)
       batch = apply_mixup_cutmix_batch(config.dataset, batch)
@@ -345,7 +366,6 @@ def train_and_evaluate(
       if config.get('log_per_step'):
         train_metrics.append(metrics)
         if (step + 1) % config.log_per_step == 0:
-          # print('Hello')
           train_metrics = common_utils.get_metrics(train_metrics)
           train_metrics.pop('labels')  # used in val only
           summary = {
@@ -365,39 +385,33 @@ def train_and_evaluate(
           train_metrics_last_t = time.time()
 
     # logging per epoch
-    if (epoch + 1) % config.eval_per_epoch == 0:
+    if (epoch + 1) % config.eval_per_epoch == 0 or epoch == 0:
       log_for_0('Eval epoch {}...'.format(epoch))
-      eval_metrics = []
+      loss_sum = 0.0
+      acc_sum = 0.0
+      n_valid = 0.0
       # sync batch statistics across replicas
       state = sync_batch_stats(state)
       for n_eval_batch, eval_batch in enumerate(eval_loader):
+        if config.steps_per_eval != -1 and n_eval_batch >= config.steps_per_eval:
+          break
         if (n_eval_batch + 1) % config.log_per_step == 0:
           log_for_0('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
         eval_batch = prepare_batch_data_sqa(eval_batch, local_batch_size)
 
-        metrics = p_eval_step(state, eval_batch) # here is the eval step
-        # print("metrics' labels shape:", metrics['labels'].shape)
-        assert metrics['labels'].shape[-1] == NUM_CLASSES
-        eval_metrics.append(metrics)
+        stats = p_eval_step(state, eval_batch)
+        loss_sum += float(jax.device_get(stats['loss_sum'])[0])
+        acc_sum += float(jax.device_get(stats['acc_sum'])[0])
+        n_valid += float(jax.device_get(stats['n_valid'])[0])
 
-      eval_metrics = common_utils.get_metrics(eval_metrics) # loss, acc, labels
-      eval_metrics_copy = eval_metrics # labels shape: (local_batch_size, 1000)
-      eval_metrics = jax.tree.map(lambda x: x.flatten(), eval_metrics)
-      log_for_0('evaluated samples: {}'.format(eval_metrics['labels'].size))
-      valid = (eval_metrics_copy['labels'] >= 0)
+      if n_valid <= 0:
+        raise ValueError('No valid samples during evaluation')
+      log_for_0('valid samples: {}'.format(int(n_valid)))
 
-      valid = valid.reshape(-1, NUM_CLASSES)
-      valid = valid[:, 0] # only take the first column, because we only need to pick out these valid samples
-      assert valid.ndim == 1
-      # omit label in eval_metrics
-      eval_metrics = {
-        'loss': eval_metrics['loss'],
-        'accuracy': eval_metrics['accuracy'],
+      summary = {
+        'loss': loss_sum / n_valid,
+        'accuracy': acc_sum / n_valid,
       }
-      eval_metrics = jax.tree.map(lambda x: x[valid], eval_metrics)
-      log_for_0('valid samples: {}'.format(eval_metrics['loss'].size))
-
-      summary = jax.tree_util.tree_map(lambda x: float(x.mean()), eval_metrics)
       log_for_0(
         'eval epoch: %d, loss: %.6f, accuracy: %.6f',
         epoch,
@@ -469,28 +483,28 @@ def just_evaluate(config: ml_collections.ConfigDict, workdir: str) -> TrainState
   state = ckpt_util.restore_checkpoint(state, load_path, workdir)
   state = jax_utils.replicate(state)
 
-  p_eval_step = jax.pmap(eval_step, axis_name='batch')
-  eval_metrics = []
+  p_eval_step = jax.pmap(eval_step_agg, axis_name='batch')
+  loss_sum = 0.0
+  acc_sum = 0.0
+  n_valid = 0.0
   state = sync_batch_stats(state)
   for n_eval_batch, eval_batch in enumerate(eval_loader):
+    if config.steps_per_eval != -1 and n_eval_batch >= config.steps_per_eval:
+      break
     if (n_eval_batch + 1) % config.log_per_step == 0:
       log_for_0('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
     eval_batch = prepare_batch_data_sqa(eval_batch, local_batch_size)
-    metrics = p_eval_step(state, eval_batch)
-    eval_metrics.append(metrics)
+    stats = p_eval_step(state, eval_batch)
+    loss_sum += float(jax.device_get(stats['loss_sum'])[0])
+    acc_sum += float(jax.device_get(stats['acc_sum'])[0])
+    n_valid += float(jax.device_get(stats['n_valid'])[0])
 
-  eval_metrics = common_utils.get_metrics(eval_metrics)
-  eval_metrics_copy = eval_metrics
-  eval_metrics = jax.tree.map(lambda x: x.flatten(), eval_metrics)
-  valid = (eval_metrics_copy['labels'] >= 0)
-  valid = valid.reshape(-1, NUM_CLASSES)
-  valid = valid[:, 0]
-  eval_metrics = {
-    'loss': eval_metrics['loss'],
-    'accuracy': eval_metrics['accuracy'],
+  if n_valid <= 0:
+    raise ValueError('No valid samples during evaluation')
+  summary = {
+    'loss': loss_sum / n_valid,
+    'accuracy': acc_sum / n_valid,
   }
-  eval_metrics = jax.tree.map(lambda x: x[valid], eval_metrics)
-  summary = jax.tree_util.tree_map(lambda x: float(x.mean()), eval_metrics)
   summary = {f'eval_{key}': val for key, val in summary.items()}
   writer.write_scalars(int(jax.device_get(state.step)[0]), summary)
   writer.flush()

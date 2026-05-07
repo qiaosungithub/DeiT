@@ -42,15 +42,12 @@ def get_config():
   config.prefetch = 10
 
   config.num_epochs = 330
-  config.log_per_step = 20
+  config.log_per_step = 100
   config.log_per_epoch = -1
-  config.eval_per_epoch = 1
+  config.eval_per_epoch = 20
   config.checkpoint_per_epoch = 20
-
-  config.steps_per_eval = -1
-
   
-  config.half_precision = True
+  config.half_precision = False
 
   config.seed = 0  # init random seed
   config.load_from = ''

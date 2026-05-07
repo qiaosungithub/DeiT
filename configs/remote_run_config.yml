@@ -27,7 +27,7 @@ dataset:
 batch_size: 1024
 learning_rate: 0.0005
 num_epochs: 330        # with repeated-aug=3, ~= 110 effective epochs + 10 cooldown
-log_per_step: 20
+log_per_step: 100
 
 optimizer: adamw
 weight_decay: 0.05

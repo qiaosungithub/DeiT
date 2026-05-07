@@ -6,7 +6,7 @@ from utils.ckpt_util import infer_zone_from_workdir
 
 
 LOCAL_IMAGENET_ROOT = f"/kmh-nfs-ssd-us-mount/data/imagenet"
-REMOTE_IMAGENET_ROOT = "/dev/shm/tmp_data/imagenet/imagenet"
+REMOTE_IMAGENET_ROOT = "/mnt/zhhm/zhh/imagenet/imagenet"
 MIN_TRAIN_FILES = 1280000
 MIN_VAL_FILES = 50000
 
@@ -113,10 +113,12 @@ def _ensure_imagenet_cache(zone):
     "(for f in /dev/shm/tmp_data/*; do "
     "if [ -f \"$f\" ]; then cat \"$f\"; rm -f \"$f\"; fi; "
     "done > /dev/shm/zhh_stream) & "
-    "rm -rf /dev/shm/tmp_data/imagenet; "
-    "mkdir -p /dev/shm/tmp_data/imagenet; "
-    "tar -C /dev/shm/tmp_data/imagenet -xf /dev/shm/zhh_stream; "
-    "rm -f /dev/shm/zhh_stream"
+    "sudo rm -rf /mnt/zhhm/zhh/imagenet; "
+    "sudo mkdir -p /mnt/zhhm/zhh/imagenet; "
+    "sudo chmod a+r /mnt/zhhm/zhh/imagenet; "
+    "sudo tar -C /mnt/zhhm/zhh/imagenet -xf /dev/shm/zhh_stream; "
+    "sudo rm -f /dev/shm/zhh_stream; "
+    "sudo rm -rf /dev/shm/tmp_data"
   )
   subprocess.run(extract_cmd, shell=True, check=True)
 
