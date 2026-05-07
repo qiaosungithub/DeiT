@@ -5,9 +5,8 @@
 model: ViT_base
 
 dataset:
-    root: "/${DATA_ROOT}/data/imagenet"
-    num_workers: 64
-    prefetch_factor: 2
+    num_workers: 16
+    prefetch_factor: 4
 
     # rand-augment / random erasing
     use_rand_augment: true
@@ -34,7 +33,7 @@ optimizer: adamw
 weight_decay: 0.05
 dropout_rate: 0.0
 stochastic_depth_rate: 0.1
-grad_norm_clip: "None"  # train.py compares against the literal string "None"
+grad_norm_clip: null
 
 logging:
     use_wandb: True

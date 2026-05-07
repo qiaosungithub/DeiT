@@ -3,7 +3,6 @@
 model: ViT_debug
 
 dataset:
-    root: "/${DATA_ROOT}/data/imagenet"
     num_workers: 2
     prefetch_factor: 2
 

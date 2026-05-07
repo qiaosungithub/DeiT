@@ -4,7 +4,6 @@ import functools
 import time
 from typing import Any
 
-from absl import logging
 from flax import jax_utils
 from flax.training import common_utils
 from flax.training import train_state
@@ -22,7 +21,7 @@ import models
 from utils.info_util import print_params
 from utils import ckpt_util
 from utils.dataset_util import resolve_and_prepare_dataset_root
-from utils.logging_util import Writer
+from utils.logging_util import Writer, log_for_0
 
 
 NUM_CLASSES = 1000
@@ -47,11 +46,11 @@ def initialized(key, image_size, model):
   def init(*args):
     return model.init(*args, rng=key)
 
-  logging.info('Initializing params...')
+  log_for_0('Initializing params...')
   variables = init({'params': key}, jnp.ones(input_shape, model.dtype))
   if 'batch_stats' not in variables:
     variables['batch_stats'] = {}
-  logging.info('Initializing params done.')
+  log_for_0('Initializing params done.')
   return variables['params'], variables['batch_stats']
 
 
@@ -260,14 +259,14 @@ def train_and_evaluate(
 
   image_size = 224
 
-  logging.info('config.batch_size: {}'.format(config.batch_size))
+  log_for_0('config.batch_size: {}'.format(config.batch_size))
   resolve_and_prepare_dataset_root(config, workdir)
 
   if config.batch_size % jax.process_count() > 0:
     raise ValueError('Batch size must be divisible by the number of processes')
   local_batch_size = config.batch_size // jax.process_count()
-  logging.info('local_batch_size: {}'.format(local_batch_size))
-  logging.info('jax.local_device_count: {}'.format(jax.local_device_count()))
+  log_for_0('local_batch_size: {}'.format(local_batch_size))
+  log_for_0('jax.local_device_count: {}'.format(jax.local_device_count()))
 
   if local_batch_size % jax.local_device_count() > 0:
     raise ValueError('Local batch size must be divisible by the number of local devices')
@@ -283,8 +282,8 @@ def train_and_evaluate(
     local_batch_size,
     split='val',
   )
-  logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
-  logging.info('steps_per_eval: {}'.format(steps_per_eval))
+  log_for_0('steps_per_epoch: {}'.format(steps_per_epoch))
+  log_for_0('steps_per_eval: {}'.format(steps_per_eval))
 
   if config.steps_per_eval != -1:
     steps_per_eval = config.steps_per_eval
@@ -320,22 +319,24 @@ def train_and_evaluate(
 
   train_metrics = []
   train_metrics_last_t = time.time()
-  logging.info('Initial compilation, this might take some minutes...')
+  log_for_0('Initial compilation, this might take some minutes...')
   for epoch in range(epoch_offset, config.num_epochs):
     if jax.process_count() > 1:
       train_loader.sampler.set_epoch(epoch)
-    logging.info('epoch {}...'.format(epoch))
+    log_for_0('epoch {}...'.format(epoch))
     for n_batch, batch in enumerate(train_loader):
       batch = pre_process_batch(batch)
       batch = apply_mixup_cutmix_batch(config.dataset, batch)
       step = epoch * steps_per_epoch + n_batch
       batch = prepare_batch_data_sqa(batch)
 
+      if step == 0: log_for_0('First batch ready')
+
       assert batch['label'].shape[-1] == NUM_CLASSES
       state, metrics = p_train_step(state, batch) # here is the training step
       
       if epoch == epoch_offset and n_batch == 0:
-        logging.info('Initial compilation completed. Reset timer.')
+        log_for_0('Initial compilation completed. Reset timer.')
         train_metrics_last_t = time.time()
       
       # normalize to IN1K epoch anyway
@@ -365,13 +366,13 @@ def train_and_evaluate(
 
     # logging per epoch
     if (epoch + 1) % config.eval_per_epoch == 0:
-      logging.info('Eval epoch {}...'.format(epoch))
+      log_for_0('Eval epoch {}...'.format(epoch))
       eval_metrics = []
       # sync batch statistics across replicas
       state = sync_batch_stats(state)
       for n_eval_batch, eval_batch in enumerate(eval_loader):
         if (n_eval_batch + 1) % config.log_per_step == 0:
-          logging.info('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
+          log_for_0('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
         eval_batch = prepare_batch_data_sqa(eval_batch, local_batch_size)
 
         metrics = p_eval_step(state, eval_batch) # here is the eval step
@@ -382,7 +383,7 @@ def train_and_evaluate(
       eval_metrics = common_utils.get_metrics(eval_metrics) # loss, acc, labels
       eval_metrics_copy = eval_metrics # labels shape: (local_batch_size, 1000)
       eval_metrics = jax.tree.map(lambda x: x.flatten(), eval_metrics)
-      logging.info('evaluated samples: {}'.format(eval_metrics['labels'].size))
+      log_for_0('evaluated samples: {}'.format(eval_metrics['labels'].size))
       valid = (eval_metrics_copy['labels'] >= 0)
 
       valid = valid.reshape(-1, NUM_CLASSES)
@@ -394,10 +395,10 @@ def train_and_evaluate(
         'accuracy': eval_metrics['accuracy'],
       }
       eval_metrics = jax.tree.map(lambda x: x[valid], eval_metrics)
-      logging.info('valid samples: {}'.format(eval_metrics['loss'].size))
+      log_for_0('valid samples: {}'.format(eval_metrics['loss'].size))
 
       summary = jax.tree_util.tree_map(lambda x: float(x.mean()), eval_metrics)
-      logging.info(
+      log_for_0(
         'eval epoch: %d, loss: %.6f, accuracy: %.6f',
         epoch,
         summary['loss'],
@@ -415,7 +416,7 @@ def train_and_evaluate(
     ):
       state = sync_batch_stats(state)
       state_to_save = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state))
-      logging.info('Saving checkpoint step %d.', int(state_to_save.step))
+      log_for_0('Saving checkpoint step %d.', int(state_to_save.step))
       ckpt_util.save_checkpoint(state_to_save, workdir, keep=2)
 
   # Wait until computations are done before exiting
@@ -473,7 +474,7 @@ def just_evaluate(config: ml_collections.ConfigDict, workdir: str) -> TrainState
   state = sync_batch_stats(state)
   for n_eval_batch, eval_batch in enumerate(eval_loader):
     if (n_eval_batch + 1) % config.log_per_step == 0:
-      logging.info('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
+      log_for_0('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
     eval_batch = prepare_batch_data_sqa(eval_batch, local_batch_size)
     metrics = p_eval_step(state, eval_batch)
     eval_metrics.append(metrics)
