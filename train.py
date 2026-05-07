@@ -393,8 +393,6 @@ def train_and_evaluate(
       # sync batch statistics across replicas
       state = sync_batch_stats(state)
       for n_eval_batch, eval_batch in enumerate(eval_loader):
-        if config.steps_per_eval != -1 and n_eval_batch >= config.steps_per_eval:
-          break
         if (n_eval_batch + 1) % config.log_per_step == 0:
           log_for_0('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
         eval_batch = prepare_batch_data_sqa(eval_batch, local_batch_size)
@@ -489,8 +487,6 @@ def just_evaluate(config: ml_collections.ConfigDict, workdir: str) -> TrainState
   n_valid = 0.0
   state = sync_batch_stats(state)
   for n_eval_batch, eval_batch in enumerate(eval_loader):
-    if config.steps_per_eval != -1 and n_eval_batch >= config.steps_per_eval:
-      break
     if (n_eval_batch + 1) % config.log_per_step == 0:
       log_for_0('eval: {}/{}'.format(n_eval_batch + 1, steps_per_eval))
     eval_batch = prepare_batch_data_sqa(eval_batch, local_batch_size)
