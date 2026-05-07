@@ -200,7 +200,15 @@ def create_split(
   rank = jax.process_index()
   if split == 'train':
     augmentations = get_augmentations(dataset_cfg)
-    transform_list = augmentations
+    if augmentations:
+      transform_list = augmentations
+    else:
+      transform_list = [
+        transforms.RandomResizedCrop(IMAGE_SIZE, interpolation=3),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=MEAN_RGB, std=STDDEV_RGB),
+      ]
     ds = datasets.ImageFolder(
         os.path.join(dataset_cfg.root, split),
         transform=transforms.Compose(transform_list),

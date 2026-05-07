@@ -11,12 +11,15 @@ def infer_zone_from_workdir(workdir):
     'us-central2',
     'asia-northeast1-b',
     'europe-west4',
+    'code/qiao/work',
   ]
   matches = [z for z in candidates if z in workdir]
   if not matches:
     raise ValueError(f'Cannot infer zone from workdir: {workdir}')
   if len(matches) != 1:
     raise ValueError(f'Multiple matched zones {matches} from workdir {workdir}')
+  if matches[0] == 'code/qiao/work':
+    return 'us-central2'
   return matches[0]
 
 

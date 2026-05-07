@@ -1,33 +1,12 @@
 import os
 import subprocess
 
+from utils.ckpt_util import infer_zone_from_workdir
+
 
 DATA_ROOT = "kmh-nfs-ssd-us-mount"
 LOCAL_IMAGENET_ROOT = f"/{DATA_ROOT}/data/imagenet"
 REMOTE_IMAGENET_ROOT = "/dev/shm/tmp_data/imagenet"
-
-
-def infer_zone_from_workdir(workdir):
-  candidates = [
-    "us-central2-b",
-    "us-central1-a",
-    "us-central1-b",
-    "us-east1-d",
-    "us-east5-a",
-    "us-east5-b",
-    "asia-northeast1-b",
-    "europe-west4-a",
-    "us-central2",
-    "us-central1",
-    "us-east1",
-    "us-east5",
-    "europe-west4",
-  ]
-  matches = [z for z in candidates if z in workdir]
-  if not matches:
-    return None
-  matches.sort(key=len, reverse=True)
-  return matches[0]
 
 
 def _infer_region(zone):
@@ -88,7 +67,7 @@ def resolve_and_prepare_dataset_root(config, workdir):
     return
 
   zone = infer_zone_from_workdir(workdir)
-  if zone == "us-central2-b":
+  if zone == "us-central2":
     config.dataset.root = LOCAL_IMAGENET_ROOT
     return
 

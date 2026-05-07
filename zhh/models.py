@@ -195,13 +195,13 @@ class ModuleWrapper:
         Returns:
             `int`: the number of parameters
         """
-        return sum(p.size for p in jax.tree_flatten(self._state.params)[0])
+        return sum(p.size for p in jax.tree.flatten(self._state.params)[0])
 
     def __str__(self):
         """
         Print the model structure. Can only be called **after** `step`.
         """
-        dic = jax.tree_map(lambda x:f'Tensor{x.shape}' if isinstance(x, jnp.ndarray) else x, self._state.params)
+        dic = jax.tree.map(lambda x:f'Tensor{x.shape}' if isinstance(x, jnp.ndarray) else x, self._state.params)
         return json.dumps(dic, indent=4)
 
     

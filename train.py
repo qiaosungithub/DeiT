@@ -56,28 +56,13 @@ def initialized(key, image_size, model):
 
 
 def cross_entropy_loss(logits, labels, label_smoothing=0.1):
+  labels = labels.astype(jnp.float32)
   # one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
   # apply label smoothing
   smooth_labels = optax.smooth_labels(labels, alpha=label_smoothing)
   xentropy = optax.softmax_cross_entropy(logits=logits, labels=smooth_labels)
   return jnp.mean(xentropy)
 
-
-# def compute_metrics(logits, labels):
-#   # compute per-sample loss
-#   one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
-#   xentropy = optax.softmax_cross_entropy(logits=logits, labels=one_hot_labels)
-#   loss = xentropy  # (local_batch_size,)
-
-#   accuracy = (jnp.argmax(logits, -1) == labels)  # (local_batch_size,)
-#   metrics = {
-#       'loss': loss,
-#       'accuracy': accuracy,
-#       'labels': labels,
-#   }
-#   metrics = lax.all_gather(metrics, axis_name='batch')
-#   metrics = jax.tree_map(lambda x: x.flatten(), metrics)  # (batch_size,)
-#   return metrics
 
 def compute_metrics(logits, labels):
   # this is the version for both one-hot labels and not one-hot labels
@@ -99,7 +84,7 @@ def compute_metrics(logits, labels):
   }
   metrics = lax.all_gather(metrics, axis_name='batch')
   labels = metrics['labels']
-  metrics = jax.tree_map(lambda x: x.flatten(), metrics)  # (batch_size,)
+  metrics = jax.tree.map(lambda x: x.flatten(), metrics)  # (batch_size,)
   metrics['labels'] = labels
   return metrics
 
@@ -396,7 +381,7 @@ def train_and_evaluate(
 
       eval_metrics = common_utils.get_metrics(eval_metrics) # loss, acc, labels
       eval_metrics_copy = eval_metrics # labels shape: (local_batch_size, 1000)
-      eval_metrics = jax.tree_map(lambda x: x.flatten(), eval_metrics)
+      eval_metrics = jax.tree.map(lambda x: x.flatten(), eval_metrics)
       logging.info('evaluated samples: {}'.format(eval_metrics['labels'].size))
       valid = (eval_metrics_copy['labels'] >= 0)
 
@@ -408,7 +393,7 @@ def train_and_evaluate(
         'loss': eval_metrics['loss'],
         'accuracy': eval_metrics['accuracy'],
       }
-      eval_metrics = jax.tree_map(lambda x: x[valid], eval_metrics)
+      eval_metrics = jax.tree.map(lambda x: x[valid], eval_metrics)
       logging.info('valid samples: {}'.format(eval_metrics['loss'].size))
 
       summary = jax.tree_util.tree_map(lambda x: float(x.mean()), eval_metrics)
@@ -495,7 +480,7 @@ def just_evaluate(config: ml_collections.ConfigDict, workdir: str) -> TrainState
 
   eval_metrics = common_utils.get_metrics(eval_metrics)
   eval_metrics_copy = eval_metrics
-  eval_metrics = jax.tree_map(lambda x: x.flatten(), eval_metrics)
+  eval_metrics = jax.tree.map(lambda x: x.flatten(), eval_metrics)
   valid = (eval_metrics_copy['labels'] >= 0)
   valid = valid.reshape(-1, NUM_CLASSES)
   valid = valid[:, 0]
@@ -503,7 +488,7 @@ def just_evaluate(config: ml_collections.ConfigDict, workdir: str) -> TrainState
     'loss': eval_metrics['loss'],
     'accuracy': eval_metrics['accuracy'],
   }
-  eval_metrics = jax.tree_map(lambda x: x[valid], eval_metrics)
+  eval_metrics = jax.tree.map(lambda x: x[valid], eval_metrics)
   summary = jax.tree_util.tree_map(lambda x: float(x.mean()), eval_metrics)
   summary = {f'eval_{key}': val for key, val in summary.items()}
   writer.write_scalars(int(jax.device_get(state.step)[0]), summary)

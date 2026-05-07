@@ -87,10 +87,5 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  # print("position of main: 3")
-  logging_util.verbose_off()
-  logging_util.set_time_logging(logging)
-  # print("position of main: 4")
-  flags.mark_flags_as_required(['config', 'workdir']) # use flags to parse the input parameters
-  # print("position of main: 5")
+  flags.mark_flags_as_required(['config', 'workdir'])
   app.run(main)

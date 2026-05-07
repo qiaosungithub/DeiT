@@ -32,7 +32,6 @@ def get_config():
   dataset.mixup_mode = 'batch'
   dataset.label_smoothing = 0.0
   dataset.repeated_aug = 3
-  dataset.num_tpus = 32
 
   # Training
   config.learning_rate = 0.0005
@@ -57,7 +56,7 @@ def get_config():
   config.load_from = ''
 
   # added by sqa
-  config.grad_norm_clip = 'None'
+  config.grad_norm_clip = None
   config.label_smoothing = 0.0
   config.dropout_rate = 0.0
   config.stochastic_depth_rate = 0.0
