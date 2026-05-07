@@ -1,0 +1,37 @@
+model: ViT_debug
+
+dataset:
+  root: "/${DATA_ROOT}/data/imagenet"
+  prefetch_factor: 2
+  num_workers: 2
+  use_rand_augment: false
+  rand_augment: rand-m9-mstd0.5-inc1
+  reprob: 0.0
+  use_mixup_cutmix: false
+  mixup_prob: 0.0
+  switch_prob: 0.5
+  mixup_alpha: 0.0
+  cutmix_alpha: 0.0
+  repeated_aug: 1
+  label_smoothing: 0.0
+  num_tpus: 1
+
+batch_size: 16
+learning_rate: 0.0001
+num_epochs: 2
+log_per_step: 1
+
+optimizer: adamw
+weight_decay: 0.0
+dropout_rate: 0.0
+stochastic_depth_rate: 0.0
+grad_norm_clip: "None"
+half_precision: false
+
+logging:
+    use_wandb: False
+    wandb_project: 'deit' # change to your wandb project
+    wandb_entity: 'sqa24-massachusetts-institute-of-technology' # paste your wandb entity here
+    wandb_tags: # use your own tags
+        - sqa
+    wandb_notes: "deit baseline"

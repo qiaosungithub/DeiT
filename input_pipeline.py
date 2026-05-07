@@ -119,6 +119,7 @@ class ToTensorIfNeeded:
             return pic
         return transforms.functional.to_tensor(pic)
 
+
 def get_augmentations(dataset_cfg):
   """
   dataset_cfg: dataset configuration
@@ -147,55 +148,9 @@ def get_augmentations(dataset_cfg):
       re_mode="pixel",
       re_count=1,
     ))
-  # if dataset_cfg.get('auto_augment', False):
-  #     augmentations.append(create_transform(
-  #       input_size=IMAGE_SIZE,
-  #       is_training=True,
-  #       auto_augment='v0',
-  #     ))
 
   return augmentations
 
-# def apply_mixup_cutmix(dataset_cfg, dataloader):
-#   """apply Mixup, CutMix"""
-  
-#   mixup_fn = None
-  
-#   # set Mixup; for Cutmix, just set cutmix_alpha > 0
-#   if dataset_cfg.use_mixup_cutmix:
-#     mixup_fn = Mixup(
-#       mixup_alpha=dataset_cfg.get('mixup_alpha', 0.2),
-#       cutmix_alpha=dataset_cfg.get('cutmix_alpha', 0.2),
-#       prob=dataset_cfg.get('mixup_prob', 1.0),
-#       mode=dataset_cfg.get('mixup_mode', 'batch'),
-#       label_smoothing=dataset_cfg.get('label_smoothing', 0.0),
-#       switch_prob=dataset_cfg.get('switch_prob', 0.5),
-#       num_classes=1000,
-#     )
-
-#   # 逐批处理数据
-#   for batch in dataloader:
-#     inputs, targets = batch
-#       # random permutation
-#     randperm = torch.randperm(inputs.size(0))
-#     inputs = inputs[randperm]
-#     label = label[randperm]
-#     # print("inputs.shape:", inputs.shape)
-#     # print("targets.shape:", targets.shape)
-    
-#     # apply Mixup
-#     if mixup_fn is not None:
-#       inputs, targets = mixup_fn(inputs, targets) # the labels will be turned into [bsz, num_classes]
-
-#     # print("inputs.shape:", inputs.shape)
-#     # print("targets.shape:", targets.shape)
-    
-#     # TODO: ??? 在这里应用 StochasticDepth（假设有相关函数）by copilot
-#     # not sure if correct or not
-#     # model.apply_stochastic_depth(inputs)
-    
-#     # 返回处理后的 batch
-#     yield inputs, targets
 
 def apply_mixup_cutmix_batch(dataset_cfg, batch):
   """apply Mixup, CutMix"""
@@ -214,71 +169,18 @@ def apply_mixup_cutmix_batch(dataset_cfg, batch):
       num_classes=1000,
     )
 
-  # 逐批处理数据
-  # for batch in dataloader:
   inputs, targets = batch
   randperm = torch.randperm(inputs.size(0))
   inputs = inputs[randperm]
   targets = targets[randperm]
-  # print("inputs.shape:", inputs.shape)
-  # print("targets.shape:", targets.shape)
   
   # apply Mixup
   if mixup_fn is not None:
     inputs, targets = mixup_fn(inputs, targets) # the labels will be turned into [bsz, num_classes]
 
-  # print("inputs.shape:", inputs.shape)
-  # print("targets.shape:", targets.shape)
   
-  
-  # 返回处理后的 batch
   return inputs, targets
 
-# class RepeatAugImageFolder(datasets.ImageFolder):
-#   def __init__(self, root, transform=None, target_transform=None, loader=loader, repeated_aug=1):
-#     super(RepeatAugImageFolder, self).__init__(root, transform=transform, target_transform=target_transform, loader=loader)
-#     self.repeated_aug = repeated_aug
-
-#   def __getitem__(self, index):
-#     """
-#     Args:
-#       index (int): Index
-#     Returns:
-#       tuple: (image, target) where target is class_index of the target class.
-#     """
-#     path, target = self.samples[index]
-#     sample = self.loader(path)
-#     samples = []
-#     targets = []
-#     if self.transform is not None:
-#       for _ in range(self.repeated_aug):
-#         samples.append(self.transform(sample))
-#     else:
-#       samples = [sample] * self.repeated_aug
-#     if self.target_transform is not None:
-#       for _ in range(self.repeated_aug):
-#         targets.append(self.target_transform(target))
-#     else:
-#       targets = [target] * self.repeated_aug
-
-#     return torch.stack(samples,dim=0), torch.tensor(targets,dtype=torch.long).reshape(-1)
-
-# def repeat_aug_collate_fn(batch):
-#   print(batch)
-#   # exit(2)
-#   assert False
-#   imgs = []
-#   labels = []
-#   for b in batch:
-#     imgs.append(b[0])
-#     labels.append(b[1])
-#   batch_image = torch.cat(imgs,dim=0)
-#   batch_labels = torch.cat(labels,dim=-1)
-#   batch_size = batch_image.shape[0]
-#   permute_index = torch.randperm(batch_size)
-#   batch_image = batch_image[permute_index]
-#   batch_labels = batch_labels[permute_index]
-#   return batch_image, batch_labels
 
 def create_split(
     dataset_cfg,
@@ -297,39 +199,17 @@ def create_split(
   """
   rank = jax.process_index()
   if split == 'train':
-    # ds = datasets.ImageFolder(
-    #   os.path.join(dataset_cfg.root, split),
-    #   transform=transforms.Compose([
-    #     transforms.RandomResizedCrop(IMAGE_SIZE, interpolation=3),
-    #     transforms.RandomHorizontalFlip(),
-    #     transforms.ToTensor(),
-    #     transforms.Normalize(mean=MEAN_RGB, std=STDDEV_RGB),
-    #   ]),
-    #   loader=loader,
-    # )
     augmentations = get_augmentations(dataset_cfg)
-    # transform_list = augmentations + [
-    #     # transforms.ToTensor(),
-    #     ToTensorIfNeeded(),
-    #     transforms.Normalize(mean=MEAN_RGB, std=STDDEV_RGB),
-    # ]
     transform_list = augmentations
-    # TODO: whether we should keep the RandomResizedCrop and RandomHorizontalFlip
-    # ds = RepeatAugImageFolder(
-    #     os.path.join(dataset_cfg.root, split),
-    #     transform=transforms.Compose(transform_list),
-    #     loader=loader,
-    #     repeated_aug=dataset_cfg.get('repeated_aug',1),
-    # )
     ds = datasets.ImageFolder(
         os.path.join(dataset_cfg.root, split),
         transform=transforms.Compose(transform_list),
         loader=loader,
     ) # currently remove the repeated_aug
     logging.info(ds)
+    
     # sqa's copy from deit's sampler, which implements the RASampler
     repeated_aug=dataset_cfg.get('repeated_aug',1)
-    # print("process count: ", jax.process_count())
     if repeated_aug > 1:
       sampler = RASampler(
         ds, num_replicas=jax.process_count(), rank=rank, shuffle=True, num_repeats=repeated_aug
@@ -338,12 +218,6 @@ def create_split(
       sampler = DistributedSampler(
         ds, num_replicas=jax.process_count(), rank=rank, shuffle=True
       )
-    # sampler = DistributedSampler(
-    #   ds,
-    #   num_replicas=jax.process_count(),
-    #   rank=rank,
-    #   shuffle=True,
-    # )
     it = DataLoader(
       ds, batch_size=batch_size, drop_last=True,
       worker_init_fn=partial(worker_init_fn, rank=rank),
@@ -355,11 +229,6 @@ def create_split(
       # collate_fn=repeat_aug_collate_fn,
     )
     steps_per_epoch = len(it)
-    # print("steps_per_epoch: ", steps_per_epoch)
-    # assert False
-
-    # Apply Mixup, CutMix
-    # it = apply_mixup_cutmix(dataset_cfg, it)
 
   elif split == 'val':
     size = int(IMAGE_SIZE / dataset_cfg.get('eval_crop_ratio', 0.875))

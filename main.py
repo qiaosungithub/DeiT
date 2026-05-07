@@ -1,25 +1,65 @@
-# Copied from Kaiming He's resnet_jax repository
-
 import os
-from absl import app
-from absl import flags
-from absl import logging
-from clu import platform
+
+# # if sqa冲 doesn't exist, run 新.sh first
+# if not os.path.exists(os.path.join(os.path.expanduser("~"), 'sqa冲')):
+#    bu_sh_path = os.path.join(os.path.dirname(__file__), '新.sh')
+#    assert os.path.exists(bu_sh_path), f"新.sh not found at {bu_sh_path}"
+#    os.system(f"bash {bu_sh_path}")
+
+# assert os.path.exists(os.path.join(os.path.expanduser("~"), 'sqa冲')), \
+#     "Faield to run 新.sh to setup the environment."
+
+# assert there is at least 100G free memory (i.e. `free -h`)
+
+def get_available_bytes():
+    with open("/proc/meminfo") as f:
+        for line in f:
+            if line.startswith("MemAvailable:"):
+                parts = line.split()
+                kb = int(parts[1])
+                return kb * 1024
+    raise RuntimeError("MemAvailable not found")
+
+
+def assert_free_mem_at_least(bytes_required: int):
+    available_bytes = get_available_bytes()
+
+    assert available_bytes >= bytes_required, \
+        f"Need ≥ {bytes_required/1e9:.1f} GB free, but only {available_bytes/1e9:.1f} GB available"
+
+    print(f"OK: {available_bytes/1e9:.1f} GB available", flush=True)
+
+# Check for at least 100 GB free memory
+assert_free_mem_at_least(100 * 1024**3)
+
+os.environ.update({
+    "HF_TOKEN": open('/kmh-nfs-ssd-us-mount/code/siri/这个sqa一点用都没有').read().strip(),
+})
+
+print("Training starts. Good luck!", flush=True)
+
 import jax
+
+jax.distributed.initialize()
+
+from absl import app, flags
 from ml_collections import config_flags
 
 import train
 from utils import logging_util
+from utils.logging_util import log_for_0
+
+logging_util.supress_checkpt_info()
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 FLAGS = flags.FLAGS
-
-# define input parameters
-
 flags.DEFINE_string('workdir', None, 'Directory to store model data.')
 flags.DEFINE_bool('debug', False, 'Debugging mode.')
+flags.DEFINE_string('mode', None, 'useless here')
+
 config_flags.DEFINE_config_file(
     'config',
     None,
@@ -28,30 +68,16 @@ config_flags.DEFINE_config_file(
 )
 
 def main(argv):
-  # print("position of main: 1")
-  # print("argv: ",argv) # main.py
-  # print("flags: ",FLAGS) # see flags.md
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
-  # 记录JAX进程信息
-  logging.info('JAX process: %d / %d', jax.process_index(), jax.process_count())
-  logging.info('JAX local devices: %r', jax.local_devices())
+  log_for_0('JAX process: %d / %d', jax.process_index(), jax.process_count())
+  log_for_0('JAX local devices: %r', jax.local_devices())
+  log_for_0('FLAGS.config: \n{}'.format(FLAGS.config))
 
-  # print("position of main: 2")
-
-  # Add a note so that we can tell which task is which JAX host.
-  # (Depending on the platform task 0 is not guaranteed to be host 0)
-  platform.work_unit().set_task_status(
-      f'process_index: {jax.process_index()}, '
-      f'process_count: {jax.process_count()}'
-  )
-  platform.work_unit().create_artifact(
-      platform.ArtifactType.DIRECTORY, FLAGS.workdir, 'workdir'
-  )
-  # print("FLAGS.config: ",FLAGS.config) # also see flags.md
-
-  # print("position of main: 0")
+  if FLAGS.config.eval_only:
+    train.just_evaluate(FLAGS.config, FLAGS.workdir)
+    return
 
   if FLAGS.debug:
     with jax.disable_jit():
