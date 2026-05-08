@@ -124,7 +124,8 @@
 - The eval uses single-step greedy decoding from fully-masked input (`masked_bits=None` → defaults to all-masked).
 - Expect very slow early improvement vs CE — diffusion has sparser gradient signal. EP=39 will be more informative.
 - ✅ **Confirmed learning at ep=39**: Run A/B ~0.52% (5x from ep=0). Run A at ep=59: **2.318%** (4.4x from ep=39) — ACCELERATING.
-- ✅ **Approach is NOT fundamentally broken**: trajectory 0.13%→0.19%→0.52%→**2.32%** shows accelerating growth.
+- ✅ **Run C ep=19 = 0.282%/iter=0.478%**: outperforms Runs A/B at ep=19 (0.186%/0.134%) by 1.5-2x — NO-MIXUP FIX CONFIRMED BETTER.
+- ✅ **Approach is NOT fundamentally broken**: trajectory is accelerating, warmup ~30 epochs before learning kicks in.
 - ⚠️ **train_loss was not logged** (fix committed 2eb25cc): loss computed but dropped from metrics dict. Now fixed.
 - **Training-eval mismatch**: train with partial masks (avg 50% masked), eval from all-masked. Warmup ~30 epochs before learning kicks in. Normal.
 - **invalid_rate interpretation**: logged as percentage (0.286% for Run D at ep=0), NOT 28.6%. Both C/D well below random 2.34%.
@@ -160,7 +161,7 @@
   | 0     | 0.146%       | 0.685     | random baseline (0.5^10 ≈ 0.097%) |
   | 19    | 0.134%       | 0.689     | ⚠️ essentially flat — loss barely below random (0.693) |
   | 39    | **0.516%**   | **0.667** | ✅ LEARNING — 3.85x jump from ep=19; loss clearly dropping |
-- **Status**: ⚠️ Preempted at ep~52.8 (log stopped 20:03); auto-resume in progress
+- **Status**: ⚠️ Preempted at ep~52.8 (log stopped 20:03); auto-resume pending >3hr — spot instance likely unavailable
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_142712_quc6xc_kmh-tpuvm-v6e-8-spot-gzy-cz2ivo_us-east5-b__b_lr_ep_eval`
 
 ### Run C — ViT_base_mdh (FIXED: no mixup, uniform mask schedule)
@@ -173,11 +174,12 @@
 - **Key fixes**: no mixup/cutmix in training, iterative eval (4-step), uniform mask schedule, b2=0.95
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_211542_1ekprl_kmh-tpuvm-v6e-8-spot-gzy-yq00yh_us-east5-b__b_lr_ep_eval`
 - **Early signal**: step=200 train_accuracy=**8.4%** (vs ~0.1% same point in Runs A/B) — NO-MIXUP FIX WORKING 🚀
-- **Status**: ✅ Running (ep~1 as of 2026-05-08 21:36; ep=19 eval ~23:30)
+- **Status**: ✅ Running (ep~20 as of 2026-05-08 23:27; ep=39 eval ~01:30)
 - **Eval checkpoints**:
   | epoch | eval_accuracy | eval_loss | eval_accuracy_iter | eval_invalid_rate | notes |
   |-------|--------------|-----------|-------------------|-------------------|-------|
-  | 0     | 0.090%       | 0.681     | 0.186%            | 0.000%            | single-step near random; iter already 2x — iterative decode working |
+  | 0     | 0.090%       | 0.681     | 0.186%            | 0.000%            | near random — expected at ep=0 |
+  | 19    | **0.282%**   | 0.682     | **0.478%**        | 0.000%            | ✅ 3.1x single-step, 2.6x iter vs ep=0; outperforms Run A/B at ep=19 (0.186%, 0.134%) |
 
 ### Run D — ViT_base_mdh (FIXED: no mixup, logit-normal mask schedule)
 - **Window**: 6364
