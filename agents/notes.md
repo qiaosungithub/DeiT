@@ -135,12 +135,28 @@ After each experiment completes:
 
 ---
 
+## Data / Region
+
+- **跨区读数据不是问题**：codebase 已自动处理 —— 启动时会从本 TPU 同区的 GCS bucket 拉取 ImageNet，放进 `/dev/shm`（本地内存），完全不跨区传输大量数据。任意区域的卡都可以用。
+- 所以 asia-northeast1-b、us-east5、us-central1 的卡均可正常用于训练。
+
+---
+
 ## Constraints and Gotchas
+
+- **DeiT 同时使用 TPU 不能超过 5 个**（跨所有 DeiT 实验，包括 v2/v3/baseline 所有 job）。
+- **Checkpoint 保存时可能出现假 Error**：tcs 把 checkpoint log 里某些打印判定为 error，其实是正常的。每次醒来检查 Error 时要看实际 log，判断是真 code error 还是假 error。
+- **清理无用 window**：如果一个 window 有明显 error 且已修复重跑，用 `tmux kill-window -t sqa:<window_id>` 关掉旧 window。
+- **循环间隔：每 30 分钟醒一次**。
 
 - **Do not modify resume logic** in `tpu_manager/MONITOR.py` or related scripts.
 - **Do not run `tpu set-cur` carelessly** — dir=7 is the DeiT directory index, don't overwrite.
 - **Only v5p ≤ 64 or v6e ≤ 32** TPUs are allowed.
-- The `label_smoothing` in `train_step_sqa` is hardcoded to `0.0` (line ~333 in train.py) — if you want to change it, pass it through the pmap partial, don't just set it in config.
+- The `label_smoothing` in `train_step_sqa` is hardcoded to `0.0` (line ~333 in train.py) — label smoothing is applied via Mixup in the dataset pipeline (`dataset.label_smoothing=0.1`).
 - `grad_norm_clip` in AdamW currently asserts it must be `None` — don't set it.
-- The current `Attention` class has `use_bias=False` for Q/K/V/out_proj — but the report says `qkv_bias = True`. This is a known discrepancy to track.
-- `Layer` has `learned_scale1/2` initialized to `1e-4` (non-standard LayerScale). This is already implemented.
+- `tpu run` always requires `dir=7` to use the DeiT directory (default is dir=1).
+- `tpu fang <new_machine> <alias>` requires the alias to already exist in data.json's `tpu_aliases`.
+- mount-disk lock file: `/tmp/xibo_mount_<tpu_name>.lock` — if stale, delete it and retry.
+- wandb `set_wandb` step may fail with local Python env issues (missing `annotated_types`) — this is non-critical, training still works.
+- **AdamW b2 = 0.95 (not 0.999)**: hardcoded in original code; now configurable via `--config.adamw_b2=0.999`. Reference DeiT uses b2=0.999. This may cause slight divergence from reference trajectory. When launching new runs, consider testing b2=0.999.
+- **Registered v6e-8 aliases**: only v6e-8-tmp201~203 point to available gzy TPUs (201=j3rqvs, 202=axuxm0, 203=p1u4mx). v6e-8-tmp204 maps to an xtiange TPU (don't claim). v6e-8-tmp205~208 are NOT registered. Currently only 3 v6e-8 slots available; to launch a 4th DeiT run, need to wait for a current run to free up or ask user to register a new alias.

@@ -59,6 +59,7 @@ def get_config():
   config.stochastic_depth_rate = 0.0
   config.weight_decay = 0.0
   config.optimizer = 'adamw'
+  config.adamw_b2 = 0.95
   config.eval_only = False
 
   config.logging = logging = ml_collections.ConfigDict()

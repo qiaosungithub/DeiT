@@ -242,10 +242,9 @@ def create_train_state(
     tx = optax.adamw(
       learning_rate=learning_rate_fn,
       b1=0.9,
-      b2=0.95,
+      b2=config.get('adamw_b2', 0.95),
       eps=1e-8,
       weight_decay=config.weight_decay,
-      # grad_norm_clip=grad_norm_clip, # None if no clipping
     )
   else:
     raise ValueError(f'Unknown optimizer: {config.optimizer}, choose from "sgd" or "adamw"')
