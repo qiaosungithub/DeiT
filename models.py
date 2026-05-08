@@ -97,6 +97,80 @@ class Layer(nn.Module):
         return x
 
 
+# ---- Phase 2: Masked Diffusion Head ----
+
+NUM_BITS = 10  # ceil(log2(1000)) = 10
+
+
+def class_to_bits(labels, n_bits=NUM_BITS):
+    """labels: (B,) int32 → (B, n_bits) int32, LSB first."""
+    powers = (2 ** jnp.arange(n_bits)).astype(jnp.int32)
+    return ((labels[:, None] // powers) % 2).astype(jnp.int32)
+
+
+def bits_to_class(bits):
+    """bits: (B, n_bits) int32 → (B,) int32."""
+    powers = (2 ** jnp.arange(bits.shape[-1])).astype(jnp.int32)
+    return jnp.sum(bits * powers, axis=-1)
+
+
+class DiffusionLayer(nn.Module):
+    """Minimal pre-norm transformer layer for the diffusion head."""
+    n_heads: int
+    dim: int
+
+    def setup(self):
+        self.ln1 = nn.LayerNorm(use_bias=True)
+        self.attn = Attention(head=self.n_heads, dim=self.dim, attn_dim=self.dim, use_bias=True)
+        self.ln2 = nn.LayerNorm(use_bias=True)
+        self.mlp = nn.Sequential([
+            special_linear(self.dim * 4),
+            nn.gelu,
+            special_linear(self.dim),
+        ])
+
+    def __call__(self, x):
+        normed = self.ln1(x)
+        x = x + self.attn(normed, normed)
+        x = x + self.mlp(self.ln2(x))
+        return x
+
+
+class MaskedDiffusionHead(nn.Module):
+    """
+    Masked diffusion head for classification.
+    Encodes label as n_bits binary, learns masked prediction via a small transformer.
+    Tokens: 0 = bit-0, 1 = bit-1, 2 = MASK.
+    """
+    n_bits: int = NUM_BITS
+    embed_dim: int = 768   # backbone CLS dim
+    inner_dim: int = 256   # internal width
+    n_layers: int = 2      # number of DiffusionLayer blocks (0 = no inter-bit attention)
+    n_heads: int = 4
+
+    def setup(self):
+        self.cls_proj = special_linear(self.inner_dim)
+        self.bit_emb = nn.Embed(3, self.inner_dim)  # tokens: 0, 1, MASK=2
+        self.bit_pos = self.param('bit_pos', nn.initializers.truncated_normal(0.02),
+                                  (self.n_bits, self.inner_dim))
+        self.diff_layers = [DiffusionLayer(n_heads=self.n_heads, dim=self.inner_dim)
+                            for _ in range(self.n_layers)]
+        self.out_proj = special_linear(2)
+
+    def __call__(self, cls_token, masked_bits):
+        """
+        cls_token:   (B, embed_dim)
+        masked_bits: (B, n_bits)  values in {0, 1, 2}
+        Returns:     (B, n_bits, 2) logits
+        """
+        cls = self.cls_proj(cls_token)[:, None, :]              # (B, 1, inner_dim)
+        bits = self.bit_emb(masked_bits) + self.bit_pos         # (B, n_bits, inner_dim)
+        x = jnp.concatenate([cls, bits], axis=1)                # (B, 1+n_bits, inner_dim)
+        for layer in self.diff_layers:
+            x = layer(x)
+        return self.out_proj(x[:, 1:, :])                       # (B, n_bits, 2)
+
+
 class ViT(nn.Module):
 
     channels: int
@@ -114,6 +188,12 @@ class ViT(nn.Module):
     use_qkv_bias: bool = False
     use_ln_bias: bool = False
     use_layer_scale: bool = True
+    # Phase 2: masked diffusion head
+    use_diffusion_head: bool = False
+    n_bits: int = 10
+    head_inner_dim: int = 256
+    head_n_layers: int = 2
+    head_n_heads: int = 4
 
     def setup(self):
         image_size = self.image_size
@@ -139,26 +219,39 @@ class ViT(nn.Module):
                              use_layer_scale=self.use_layer_scale)
                        for _ in range(n_layers)]
         self.final_ln = nn.LayerNorm(use_scale=True, use_bias=False,scale_init=nn.initializers.ones)
-        self.fc = special_linear(num_classes, use_bias=True)
+        if not self.use_diffusion_head:
+            self.fc = special_linear(num_classes, use_bias=True)
+        else:
+            self.diffusion_head = MaskedDiffusionHead(
+                n_bits=self.n_bits,
+                embed_dim=embed_dim,
+                inner_dim=self.head_inner_dim,
+                n_layers=self.head_n_layers,
+                n_heads=self.head_n_heads,
+            )
 
-    def __call__(self, x:jnp.ndarray, rng, train=True):
-        # print('In model: training is ', training)
-        # x.shape: [B, H, W, C]
+    def encode(self, x: jnp.ndarray, rng, train=True):
+        """Return CLS token embedding (before head)."""
         p = self.patch_size
-        x = F.patchify(x, patch_size=p) # [B, num_patch, C*patch_size**2]
+        x = F.patchify(x, patch_size=p)
         embed = self.embedding(x)
         x = jnp.concatenate((self.cls.repeat(x.shape[0], axis=0), embed), axis=1)
-        # print_stat('x:', x)
         x += self.pos_emb
         x = F.dropout(x, rate=self.dropout_rate, training=train, rng=rng); rng = zr.next(rng)
-        # print_stat('x:', x)
+        for ly in self.layers:
+            x = ly(x, rng=rng, training=train); rng = zr.next(rng)
+        return self.final_ln(x[:, 0])  # (B, embed_dim)
 
-        for i,ly in enumerate(self.layers):
-            x = ly(x, rng=rng, training=train); rng=zr.next(rng)
-        #     print_stat(f'layer {i}:', x)
-        # print_stat('x:', x)
-        x = self.final_ln(x[:,0])
-        return self.fc(x)
+    def __call__(self, x:jnp.ndarray, rng, train=True, masked_bits=None):
+        # print('In model: training is ', training)
+        # x.shape: [B, H, W, C]
+        cls = self.encode(x, rng, train)
+        if not self.use_diffusion_head:
+            return self.fc(cls)
+        else:
+            if masked_bits is None:
+                masked_bits = jnp.full((x.shape[0], self.n_bits), 2)
+            return self.diffusion_head(cls, masked_bits)
 
 ViT_base = partial(
     ViT,
@@ -211,6 +304,29 @@ ViT_base_v3 = partial(
     use_qkv_bias=True,
     use_ln_bias=True,
     use_layer_scale=True,
+)
+
+# Phase 2: DeiT-B backbone (v3) + masked diffusion head
+ViT_base_mdh = partial(
+    ViT,
+    channels=3,
+    image_size=224,
+    patch_size=16,
+    num_classes=1000,
+    embed_dim=768,
+    n_layers=12,
+    heads=12,
+    linear_dim=3072,
+    attn_dim=768,
+    dropout_rate=0,
+    use_qkv_bias=True,
+    use_ln_bias=True,
+    use_layer_scale=True,
+    use_diffusion_head=True,
+    n_bits=NUM_BITS,
+    head_inner_dim=256,
+    head_n_layers=2,
+    head_n_heads=4,
 )
 
 ViT_debug = partial(

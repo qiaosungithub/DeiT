@@ -27,6 +27,62 @@ from utils.logging_util import Writer, log_for_0
 NUM_CLASSES = 1000
 
 
+def masked_diffusion_loss(logits, bits, mask):
+    """
+    logits: (B, n_bits, 2)
+    bits:   (B, n_bits) int32 original bit targets
+    mask:   (B, n_bits) float32, 1 = masked position
+    Returns scalar loss averaged over masked positions.
+    """
+    targets = jax.nn.one_hot(bits, 2)                          # (B, n_bits, 2)
+    per_bit_loss = optax.softmax_cross_entropy(logits, targets) # (B, n_bits)
+    masked_loss = per_bit_loss * mask
+    return masked_loss.sum() / (mask.sum() + 1e-8)
+
+
+def diffusion_decode_greedy(logits):
+    """
+    Single-step decode: take argmax per bit.
+    logits: (B, n_bits, 2) → (B,) predicted class (clipped to [0, NUM_CLASSES))
+    """
+    bits = jnp.argmax(logits, axis=-1)                         # (B, n_bits)
+    classes = models.bits_to_class(bits)                       # (B,)
+    return jnp.clip(classes, 0, NUM_CLASSES - 1)
+
+
+def diffusion_decode_iterative(state, images, n_steps=10):
+    """
+    Iterative maskgit-style decoding.
+    Unmasks floor(n_bits * t / n_steps) bits at each step t.
+    Returns (B,) predicted classes.
+    """
+    n_bits = state.apply_fn.__self__.n_bits if hasattr(state.apply_fn, '__self__') else 10
+    B = images.shape[0]
+    masked_bits = jnp.full((B, n_bits), 2, dtype=jnp.int32)   # all masked
+    rng = jax.random.PRNGKey(0)
+
+    for t in range(1, n_steps + 1):
+        variables = {'params': state.params, 'batch_stats': state.batch_stats}
+        logits = state.apply_fn(variables, images, train=False, mutable=False,
+                                rng=rng, masked_bits=masked_bits)   # (B, n_bits, 2)
+        probs = jax.nn.softmax(logits, axis=-1)                     # (B, n_bits, 2)
+        predicted_bits = jnp.argmax(logits, axis=-1)                # (B, n_bits)
+        confidence = jnp.max(probs, axis=-1)                        # (B, n_bits)
+
+        # Only unmask currently-masked positions
+        still_masked = (masked_bits == 2).astype(jnp.float32)       # (B, n_bits)
+        masked_confidence = confidence * still_masked + 1e9 * (1 - still_masked)  # high conf for unmasked
+
+        n_to_unmask = max(1, int(n_bits * t / n_steps) - int(n_bits * (t - 1) / n_steps))
+        # Unmask top-n_to_unmask positions per sample by confidence
+        threshold = jnp.sort(masked_confidence, axis=-1)[:, -(n_to_unmask)]  # (B,)
+        unmask_now = (masked_confidence >= threshold[:, None]) & (masked_bits == 2)
+        masked_bits = jnp.where(unmask_now, predicted_bits, masked_bits)
+
+    classes = models.bits_to_class(masked_bits)
+    return jnp.clip(classes, 0, NUM_CLASSES - 1)
+
+
 def create_model(*, model_cls, half_precision, **kwargs):
   platform = jax.local_devices()[0].platform
   if half_precision:
@@ -193,6 +249,84 @@ def eval_step_agg(state, batch):
   return lax.psum(stats, axis_name='batch')
 
 
+def train_step_diffusion(state, batch, rng_init, learning_rate_fn):
+  """Training step for masked diffusion head."""
+  rng_step = random.fold_in(rng_init, state.step)
+  rng_device = random.fold_in(rng_step, lax.axis_index(axis_name='batch'))
+  rng_dropout, rng_mask = random.split(rng_device)
+
+  def loss_fn(params):
+    labels_soft = batch['label']                                   # (B, NUM_CLASSES) soft one-hot after Mixup
+    labels_int = jnp.argmax(labels_soft, axis=-1).astype(jnp.int32)  # (B,) hard labels via argmax
+    bits = models.class_to_bits(labels_int)                        # (B, n_bits)
+    B, n_bits = bits.shape
+
+    # Sample per-sample mask ratio t ~ Uniform(0, 1), then mask each bit independently
+    rng_t, rng_b = random.split(rng_mask)
+    t = random.uniform(rng_t, (B, 1))
+    bit_mask = (random.uniform(rng_b, (B, n_bits)) < t).astype(jnp.float32)
+    masked_bits = jnp.where(bit_mask.astype(bool), 2, bits).astype(jnp.int32)
+
+    logits, new_model_state = state.apply_fn(
+      {'params': params, 'batch_stats': state.batch_stats},
+      batch['image'],
+      mutable=['batch_stats'],
+      rng=rng_dropout,
+      masked_bits=masked_bits,
+    )
+    loss = masked_diffusion_loss(logits, bits, bit_mask)
+    return loss, (new_model_state, logits, bits, bit_mask)
+
+  step = state.step
+  lr = learning_rate_fn(step)
+  grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+  aux, grads = grad_fn(state.params)
+  grads = lax.pmean(grads, axis_name='batch')
+  new_model_state, logits, bits, bit_mask = aux[1]
+
+  # Accuracy: decode greedily and compare
+  pred_classes = diffusion_decode_greedy(logits)                  # (B,)
+  true_classes = models.bits_to_class(bits)                       # (B,)
+  accuracy = (pred_classes == true_classes).astype(jnp.float32)
+  metrics = {'accuracy': accuracy, 'lr': lr}
+  metrics = lax.all_gather(metrics, axis_name='batch')
+  metrics = jax.tree.map(lambda x: x.flatten(), metrics)
+
+  new_state = state.apply_gradients(
+    grads=grads, batch_stats=new_model_state['batch_stats']
+  )
+  return new_state, metrics
+
+
+def eval_step_diffusion(state, batch):
+  """Eval step for masked diffusion head (single-step greedy decode)."""
+  variables = {'params': state.params, 'batch_stats': state.batch_stats}
+  # All-mask inference: let model decode from fully masked sequence
+  logits = state.apply_fn(variables, batch['image'], train=False, mutable=False,
+                          rng=jax.random.PRNGKey(0))              # (B, n_bits, 2)
+
+  labels = batch['label']
+  if labels.shape[-1] != NUM_CLASSES:
+    labels = jax.nn.one_hot(labels, NUM_CLASSES)
+  true_classes = jnp.argmax(labels, axis=-1).astype(jnp.int32)   # (B,)
+  pred_classes = diffusion_decode_greedy(logits)                  # (B,)
+
+  valid = (labels[..., 0] >= 0).astype(jnp.float32)
+  per_example_acc = (pred_classes == true_classes).astype(jnp.float32)
+
+  # Loss: CE over all bits with all-mask input
+  bits = models.class_to_bits(true_classes)                       # (B, n_bits)
+  all_mask = jnp.ones(bits.shape, dtype=jnp.float32)
+  loss = masked_diffusion_loss(logits, bits, all_mask)
+
+  stats = {
+    'loss_sum': jnp.sum(loss * valid),
+    'acc_sum': jnp.sum(per_example_acc * valid),
+    'n_valid': jnp.sum(valid),
+  }
+  return lax.psum(stats, axis_name='batch')
+
+
 class TrainState(train_state.TrainState):
   batch_stats: Any
 
@@ -309,10 +443,14 @@ def train_and_evaluate(
   base_learning_rate = config.learning_rate * config.batch_size / 512.0 # note that here the input config.learning_rate is 0.0005 in the paper
 
   model_cls = getattr(models, config.model)
+  use_diffusion_head = config.get('use_diffusion_head', False) or 'mdh' in config.model
   model = create_model(
     model_cls=model_cls, half_precision=config.half_precision,
     dropout_rate=config.dropout_rate,
     stochastic_depth_rate=config.stochastic_depth_rate,
+    head_inner_dim=config.get('head_inner_dim', 256),
+    head_n_layers=config.get('head_n_layers', 2),
+    head_n_heads=config.get('head_n_heads', 4),
   )
 
   learning_rate_fn = create_learning_rate_fn(config, base_learning_rate, steps_per_epoch)
@@ -332,8 +470,12 @@ def train_and_evaluate(
     functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn, label_smoothing=0.0),
     axis_name='batch',
     donate_argnums=(0, 1),
+  ) if not use_diffusion_head else jax.pmap(
+    functools.partial(train_step_diffusion, rng_init=rng, learning_rate_fn=learning_rate_fn),
+    axis_name='batch',
+    donate_argnums=(0, 1),
   )
-  p_eval_step = jax.pmap(eval_step_agg, axis_name='batch')
+  p_eval_step = jax.pmap(eval_step_agg, axis_name='batch') if not use_diffusion_head else jax.pmap(eval_step_diffusion, axis_name='batch')
 
   train_metrics = []
   train_metrics_last_t = time.time()

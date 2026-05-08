@@ -62,6 +62,12 @@ def get_config():
   config.adamw_b2 = 0.95
   config.eval_only = False
 
+  # Phase 2: masked diffusion head
+  config.use_diffusion_head = False
+  config.head_inner_dim = 256
+  config.head_n_layers = 2
+  config.head_n_heads = 4
+
   config.logging = logging = ml_collections.ConfigDict()
   logging.wandb_project = ''
   logging.use_wandb = False
