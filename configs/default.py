@@ -67,6 +67,8 @@ def get_config():
   config.head_inner_dim = 256
   config.head_n_layers = 2
   config.head_n_heads = 4
+  config.mask_schedule = 'uniform'   # 'uniform' or 'logit_normal'
+  config.eval_iter_steps = 4         # iterative decode steps in eval
 
   config.logging = logging = ml_collections.ConfigDict()
   logging.wandb_project = ''

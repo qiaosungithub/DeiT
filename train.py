@@ -249,21 +249,26 @@ def eval_step_agg(state, batch):
   return lax.psum(stats, axis_name='batch')
 
 
-def train_step_diffusion(state, batch, rng_init, learning_rate_fn):
+def train_step_diffusion(state, batch, rng_init, learning_rate_fn, mask_schedule='uniform'):
   """Training step for masked diffusion head."""
   rng_step = random.fold_in(rng_init, state.step)
   rng_device = random.fold_in(rng_step, lax.axis_index(axis_name='batch'))
   rng_dropout, rng_mask = random.split(rng_device)
 
   def loss_fn(params):
-    labels_soft = batch['label']                                   # (B, NUM_CLASSES) soft one-hot after Mixup
-    labels_int = jnp.argmax(labels_soft, axis=-1).astype(jnp.int32)  # (B,) hard labels via argmax
+    labels_soft = batch['label']                                   # (B, NUM_CLASSES) one-hot (no mixup for diffusion)
+    labels_int = jnp.argmax(labels_soft, axis=-1).astype(jnp.int32)  # (B,) hard labels
     bits = models.class_to_bits(labels_int)                        # (B, n_bits)
     B, n_bits = bits.shape
 
-    # Sample per-sample mask ratio t ~ Uniform(0, 1), then mask each bit independently
+    # Sample mask ratio t, then mask each bit independently
     rng_t, rng_b = random.split(rng_mask)
-    t = random.uniform(rng_t, (B, 1))
+    if mask_schedule == 'logit_normal':
+      # t = sigmoid(z * 2), z ~ Normal(0,1) — concentrates mask ratio near 0.5
+      z = random.normal(rng_t, (B, 1))
+      t = jax.nn.sigmoid(z * 2.0)
+    else:  # uniform
+      t = random.uniform(rng_t, (B, 1))
     bit_mask = (random.uniform(rng_b, (B, n_bits)) < t).astype(jnp.float32)
     masked_bits = jnp.where(bit_mask.astype(bool), 2, bits).astype(jnp.int32)
 
@@ -298,30 +303,70 @@ def train_step_diffusion(state, batch, rng_init, learning_rate_fn):
   return new_state, metrics
 
 
-def eval_step_diffusion(state, batch):
-  """Eval step for masked diffusion head (single-step greedy decode)."""
+def eval_step_diffusion(state, batch, n_iter_steps=4):
+  """Eval step for masked diffusion head: single-step greedy + iterative decode."""
   variables = {'params': state.params, 'batch_stats': state.batch_stats}
-  # All-mask inference: let model decode from fully masked sequence
-  logits = state.apply_fn(variables, batch['image'], train=False, mutable=False,
-                          rng=jax.random.PRNGKey(0))              # (B, n_bits, 2)
+  images = batch['image']
+  rng = jax.random.PRNGKey(0)
+  n_bits = models.NUM_BITS
 
+  # ---- Single-step greedy (all-masked) ----
+  logits_single = state.apply_fn(variables, images, train=False, mutable=False,
+                                 rng=rng)                          # (B, n_bits, 2)
+
+  # ---- Iterative decode (confidence-based progressive unmasking) ----
+  # Each step unmasks ceil(n_bits / n_iter_steps) most confident bits
+  k_per_step = max(1, -((-n_bits) // n_iter_steps))               # ceil div
+  B = images.shape[0]
+  init_masked = jnp.full((B, n_bits), 2, dtype=jnp.int32)
+
+  def decode_step(carry, _):
+    mb = carry
+    logits = state.apply_fn(variables, images, train=False, mutable=False,
+                            rng=rng, masked_bits=mb)
+    probs = jax.nn.softmax(logits, axis=-1)
+    pred_bits = jnp.argmax(logits, axis=-1)                       # (B, n_bits)
+    conf = jnp.max(probs, axis=-1)                                 # (B, n_bits)
+    still_masked = (mb == 2)
+    eff_conf = jnp.where(still_masked, conf, jnp.full_like(conf, -jnp.inf))
+    sorted_conf = jnp.sort(eff_conf, axis=-1)[:, ::-1]            # descending
+    threshold = sorted_conf[:, k_per_step - 1:k_per_step]         # (B, 1)
+    to_unmask = still_masked & (eff_conf >= threshold)
+    return jnp.where(to_unmask, pred_bits, mb), None
+
+  final_bits, _ = jax.lax.scan(decode_step, init_masked, None, length=n_iter_steps)
+
+  # ---- Labels ----
   labels = batch['label']
   if labels.shape[-1] != NUM_CLASSES:
     labels = jax.nn.one_hot(labels, NUM_CLASSES)
-  true_classes = jnp.argmax(labels, axis=-1).astype(jnp.int32)   # (B,)
-  pred_classes = diffusion_decode_greedy(logits)                  # (B,)
-
+  true_classes = jnp.argmax(labels, axis=-1).astype(jnp.int32)
   valid = (labels[..., 0] >= 0).astype(jnp.float32)
-  per_example_acc = (pred_classes == true_classes).astype(jnp.float32)
 
-  # Loss: CE over all bits with all-mask input
-  bits = models.class_to_bits(true_classes)                       # (B, n_bits)
-  all_mask = jnp.ones(bits.shape, dtype=jnp.float32)
-  loss = masked_diffusion_loss(logits, bits, all_mask)
+  # Single-step metrics
+  bits_single = jnp.argmax(logits_single, axis=-1)                # (B, n_bits)
+  pred_single_raw = models.bits_to_class(bits_single)
+  invalid_single = (pred_single_raw >= NUM_CLASSES).astype(jnp.float32)
+  pred_single = jnp.clip(pred_single_raw, 0, NUM_CLASSES - 1)
+  acc_single = (pred_single == true_classes).astype(jnp.float32)
+
+  # Iterative decode metrics
+  pred_iter_raw = models.bits_to_class(final_bits)
+  invalid_iter = (pred_iter_raw >= NUM_CLASSES).astype(jnp.float32)
+  pred_iter = jnp.clip(pred_iter_raw, 0, NUM_CLASSES - 1)
+  acc_iter = (pred_iter == true_classes).astype(jnp.float32)
+
+  # Loss: CE over all bits with all-mask input (single-step)
+  true_bits = models.class_to_bits(true_classes)
+  all_mask = jnp.ones(true_bits.shape, dtype=jnp.float32)
+  loss = masked_diffusion_loss(logits_single, true_bits, all_mask)
 
   stats = {
     'loss_sum': jnp.sum(loss * valid),
-    'acc_sum': jnp.sum(per_example_acc * valid),
+    'acc_sum': jnp.sum(acc_single * valid),
+    'acc_iter_sum': jnp.sum(acc_iter * valid),
+    'invalid_sum': jnp.sum(invalid_single * valid),
+    'invalid_iter_sum': jnp.sum(invalid_iter * valid),
     'n_valid': jnp.sum(valid),
   }
   return lax.psum(stats, axis_name='batch')
@@ -471,11 +516,15 @@ def train_and_evaluate(
     axis_name='batch',
     donate_argnums=(0, 1),
   ) if not use_diffusion_head else jax.pmap(
-    functools.partial(train_step_diffusion, rng_init=rng, learning_rate_fn=learning_rate_fn),
+    functools.partial(train_step_diffusion, rng_init=rng, learning_rate_fn=learning_rate_fn,
+                      mask_schedule=config.get('mask_schedule', 'uniform')),
     axis_name='batch',
     donate_argnums=(0, 1),
   )
-  p_eval_step = jax.pmap(eval_step_agg, axis_name='batch') if not use_diffusion_head else jax.pmap(eval_step_diffusion, axis_name='batch')
+  p_eval_step = jax.pmap(eval_step_agg, axis_name='batch') if not use_diffusion_head else jax.pmap(
+    functools.partial(eval_step_diffusion, n_iter_steps=config.get('eval_iter_steps', 4)),
+    axis_name='batch',
+  )
 
   train_metrics = []
   train_metrics_last_t = time.time()
@@ -488,7 +537,8 @@ def train_and_evaluate(
 
     for n_batch, batch in enumerate(train_loader):
       batch = pre_process_batch(batch)
-      batch = apply_mixup_cutmix_batch(config.dataset, batch)
+      if not use_diffusion_head:
+        batch = apply_mixup_cutmix_batch(config.dataset, batch)
       step = epoch * steps_per_epoch + n_batch
       batch = prepare_batch_data_sqa(batch)
 
@@ -530,6 +580,9 @@ def train_and_evaluate(
       log_for_0('Eval epoch {}...'.format(epoch))
       loss_sum = 0.0
       acc_sum = 0.0
+      acc_iter_sum = 0.0
+      invalid_sum = 0.0
+      invalid_iter_sum = 0.0
       n_valid = 0.0
       # sync batch statistics across replicas
       state = sync_batch_stats(state)
@@ -542,6 +595,10 @@ def train_and_evaluate(
         loss_sum += float(jax.device_get(stats['loss_sum'])[0])
         acc_sum += float(jax.device_get(stats['acc_sum'])[0])
         n_valid += float(jax.device_get(stats['n_valid'])[0])
+        if use_diffusion_head:
+          acc_iter_sum += float(jax.device_get(stats['acc_iter_sum'])[0])
+          invalid_sum += float(jax.device_get(stats['invalid_sum'])[0])
+          invalid_iter_sum += float(jax.device_get(stats['invalid_iter_sum'])[0])
 
       if n_valid <= 0:
         raise ValueError('No valid samples during evaluation')
@@ -551,12 +608,23 @@ def train_and_evaluate(
         'loss': loss_sum / n_valid,
         'accuracy': acc_sum / n_valid,
       }
+      if use_diffusion_head:
+        summary['accuracy_iter'] = acc_iter_sum / n_valid
+        summary['invalid_rate'] = invalid_sum / n_valid
+        summary['invalid_iter_rate'] = invalid_iter_sum / n_valid
       log_for_0(
         'eval epoch: %d, loss: %.6f, accuracy: %.6f',
         epoch,
         summary['loss'],
         summary['accuracy'] * 100,
       )
+      if use_diffusion_head:
+        log_for_0(
+          'eval epoch: %d, accuracy_iter: %.6f, invalid_rate: %.6f',
+          epoch,
+          summary['accuracy_iter'] * 100,
+          summary['invalid_rate'] * 100,
+        )
       summary = {f'eval_{key}': val for key, val in summary.items()}
       summary["ep"] = ep
       writer.write_scalars(step + 1, summary)
