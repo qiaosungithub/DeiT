@@ -74,7 +74,8 @@
   | 119   | 64.69%       | ✅ now AHEAD of v1 (64.42%) at same epoch |
   | 139   | 64.68%       | ✅ essentially flat (v1 had dip to 63.9% here) |
   | 159   | **65.86%**   | ✅ +1.18% jump — now LEADING all runs at ep=159 |
-- **Status**: Running (ep~160; ep=179 eval pending ~23:47)
+  | 179   | 66.348%      | ✅ continued growth (+0.49%) |
+- **Status**: Running (ep~180 as of 2026-05-08 21:54; ep=199 eval ~23:54)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -84,24 +85,23 @@
 |-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | 68.98% | **69.73%** | TBD |
 | 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | **63.03%**⚠️| TBD   | TBD   | TBD |
-| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | **65.86%**✅ | TBD   | TBD   | TBD   | TBD |
+| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | **66.35%**✅ | TBD   | TBD   | TBD |
 
-**Ranking at ep=159**: v3(65.86%) > v1(65.41%) > v2(64.08%) — v3 is the best backbone
-- **Run 1 ep=259 = 69.73%**: steady growth, on track for ~81% final.
-- **Run 2 ep=179 = 63.03%**: ⚠️ DROPPED from 64.08% — no LS causes instability around ep=160-180. Likely temporary recovery ahead.
-- **Run 3 ep=159 = 65.86%**: ✅ LEADING — ep=179 eval pending.
-- **Key conclusion**: v3 (biases+LS) is the best Phase 1 backbone — more stable than v1, significantly ahead of v2.
+**Ranking at ep=179**: v1(66.80%) > v3(66.35%) > v2(63.03%) — v1 retakes lead at ep=179; v3 close
+- **Run 1 ep=259 = 69.73%**: steady growth.
+- **Run 2 ep=179 = 63.03%**: ⚠️ dipped from 64.08% — no LS instability. Watch for recovery at ep=199.
+- **Run 3 ep=179 = 66.35%**: ✅ continued growth; slightly behind Run 1 at same epoch.
 
 **⚠️ Run 1 plateau RESOLVED**: 64.4%→64.4%→63.9%→**65.41%**→**66.80%**→**68.07%** (ep99→119→139→159→179→199)
 
 ## TODO / Next Steps
 - Run 1: ep=279 next eval (~23:49)
 - Run 2: ep=199 next eval (~23:47) — watch for recovery from ep=179 dip
-- Run 3: ep=179 eval pending (~23:47)
+- Run 3: ep=199 next eval (~23:54)
 - **Phase 2 Run A** (6352): ep=79 eval ~23:47
-- **Phase 2 Run B** (6349): preempted at ep~52.8; auto-resume in progress
-- **Phase 2 Runs C/D**: ep=19 eval ~23:30 (C), ~23:37 (D) — first real learning signal
-- **train_loss fix**: committed (2eb25cc); Runs C/D will pick it up on next resume
+- **Phase 2 Run B** (6349): preempted at ep~52.8 since 20:03 — auto-resume pending (>2.5hr)
+- **Phase 2 Runs C/D**: ep=19 eval ~23:30 (C), ~23:37 (D)
+- **train_loss fix**: committed (2eb25cc); will appear when Runs C/D resume from new staged code
 - **Phase 2 Run C**: BLOCKED — need user to register yq00yh in spreadsheet
 - **Phase 2 Run D**: PLANNED — logit-normal mask schedule
 
