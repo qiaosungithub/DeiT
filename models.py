@@ -27,15 +27,16 @@ class Attention(nn.Module):
     head: int
     dim: int
     attn_dim: int
+    use_bias: bool = False
 
     def setup(self):
         assert self.dim % self.head == 0
         self.head_dim = self.attn_dim // self.head
 
-        self.Q = special_linear(self.attn_dim, use_bias=False)
-        self.K = special_linear(self.attn_dim, use_bias=False)
-        self.V = special_linear(self.attn_dim, use_bias=False)
-        self.out_proj = special_linear(self.attn_dim, use_bias=False)
+        self.Q = special_linear(self.attn_dim, use_bias=self.use_bias)
+        self.K = special_linear(self.attn_dim, use_bias=self.use_bias)
+        self.V = special_linear(self.attn_dim, use_bias=self.use_bias)
+        self.out_proj = special_linear(self.attn_dim, use_bias=self.use_bias)
 
     def __call__(self, x, context):
         q = self.Q(x).reshape(*x.shape[:2], self.head, self.head_dim)
@@ -56,29 +57,43 @@ class Layer(nn.Module):
     attn_dim: int
     dropout_rate: float
     stochastic_depth_rate: float
+    use_qkv_bias: bool = False
+    use_ln_bias: bool = False
+    use_layer_scale: bool = True
 
     def setup(self):
-        self.attn = Attention(self.head, self.dim, self.attn_dim)
-        self.ln1 = nn.LayerNorm(use_bias=False, use_scale=True, scale_init=nn.initializers.ones)
+        self.attn = Attention(self.head, self.dim, self.attn_dim, use_bias=self.use_qkv_bias)
+        self.ln1 = nn.LayerNorm(use_bias=self.use_ln_bias, use_scale=True, scale_init=nn.initializers.ones)
         self.mlp = nn.Sequential([
             special_linear(self.linear_dim),
             nn.gelu,
             special_linear(self.dim)
         ])
-        self.ln2 = nn.LayerNorm(use_bias=False, use_scale=True, scale_init=nn.initializers.ones)
-        self.learned_scale1 = self.param('learned_scale1', nn.initializers.constant(1e-4), (1,1,self.dim,))
-        self.learned_scale2 = self.param('learned_scale2', nn.initializers.constant(1e-4), (1,1,self.dim,))
+        self.ln2 = nn.LayerNorm(use_bias=self.use_ln_bias, use_scale=True, scale_init=nn.initializers.ones)
+        if self.use_layer_scale:
+            self.learned_scale1 = self.param('learned_scale1', nn.initializers.constant(1e-4), (1,1,self.dim,))
+            self.learned_scale2 = self.param('learned_scale2', nn.initializers.constant(1e-4), (1,1,self.dim,))
 
     def __call__(self, x,rng, training=True):
         # print('In layer: training is ', training)
         xc = x
         x = self.ln1(x)
         x = F.dropout(self.attn(x, x), rate=self.dropout_rate, training=training, rng=rng); rng = zr.next(rng)
-        x = xc + F.stochastic_depth(x, self.stochastic_depth_rate, training, rng, mode='row') * self.learned_scale1; rng = zr.next(rng)
+        sd1 = F.stochastic_depth(x, self.stochastic_depth_rate, training, rng, mode='row')
+        if self.use_layer_scale:
+            x = xc + sd1 * self.learned_scale1
+        else:
+            x = xc + sd1
+        rng = zr.next(rng)
 
         xc = x
         x = F.dropout(self.mlp(self.ln2(x)), rate=self.dropout_rate, training=training, rng=rng); rng = zr.next(rng)
-        x = xc + F.stochastic_depth(x, self.stochastic_depth_rate, training, rng, mode='row') * self.learned_scale2; rng = zr.next(rng)
+        sd2 = F.stochastic_depth(x, self.stochastic_depth_rate, training, rng, mode='row')
+        if self.use_layer_scale:
+            x = xc + sd2 * self.learned_scale2
+        else:
+            x = xc + sd2
+        rng = zr.next(rng)
         return x
 
 
@@ -96,6 +111,9 @@ class ViT(nn.Module):
     dropout_rate: float
     stochastic_depth_rate: float
     dtype: jnp.dtype = jnp.float32
+    use_qkv_bias: bool = False
+    use_ln_bias: bool = False
+    use_layer_scale: bool = True
 
     def setup(self):
         image_size = self.image_size
@@ -113,7 +131,13 @@ class ViT(nn.Module):
         # self.pos_emb = sinous_embedding(num_patches + 1, embed_dim)
         self.pos_emb = self.param('pos_emb', nn.initializers.truncated_normal(0.02), (1, num_patches + 1, embed_dim))
         self.cls = self.param('cls', nn.initializers.truncated_normal(0.02), (1, 1, embed_dim))
-        self.layers = [Layer(heads, embed_dim, self.linear_dim, self.attn_dim, dropout_rate=self.dropout_rate,stochastic_depth_rate=self.stochastic_depth_rate) for _ in range(n_layers)]
+        self.layers = [Layer(heads, embed_dim, self.linear_dim, self.attn_dim,
+                             dropout_rate=self.dropout_rate,
+                             stochastic_depth_rate=self.stochastic_depth_rate,
+                             use_qkv_bias=self.use_qkv_bias,
+                             use_ln_bias=self.use_ln_bias,
+                             use_layer_scale=self.use_layer_scale)
+                       for _ in range(n_layers)]
         self.final_ln = nn.LayerNorm(use_scale=True, use_bias=False,scale_init=nn.initializers.ones)
         self.fc = special_linear(num_classes, use_bias=True)
 
@@ -146,8 +170,47 @@ ViT_base = partial(
     n_layers=12,
     heads=12,
     linear_dim=3072,
-    attn_dim=768, # the ViT-base doesn't use the trick
+    attn_dim=768,
     dropout_rate=0,
+    use_qkv_bias=False,
+    use_ln_bias=False,
+    use_layer_scale=True,
+)
+
+# Exact match to reference DeiT-B: biases everywhere, no LearnedScale
+ViT_base_v2 = partial(
+    ViT,
+    channels=3,
+    image_size=224,
+    patch_size=16,
+    num_classes=1000,
+    embed_dim=768,
+    n_layers=12,
+    heads=12,
+    linear_dim=3072,
+    attn_dim=768,
+    dropout_rate=0,
+    use_qkv_bias=True,
+    use_ln_bias=True,
+    use_layer_scale=False,
+)
+
+# Biases + LearnedScale (intermediate variant)
+ViT_base_v3 = partial(
+    ViT,
+    channels=3,
+    image_size=224,
+    patch_size=16,
+    num_classes=1000,
+    embed_dim=768,
+    n_layers=12,
+    heads=12,
+    linear_dim=3072,
+    attn_dim=768,
+    dropout_rate=0,
+    use_qkv_bias=True,
+    use_ln_bias=True,
+    use_layer_scale=True,
 )
 
 ViT_debug = partial(

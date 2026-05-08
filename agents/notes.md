@@ -1,0 +1,146 @@
+# Auto Research Notes — DeiT + Masked Diffusion Head
+
+## Research Goal
+
+The goal is to replace the standard logit head + CE loss in image classification (DeiT-Base on ImageNet-1K) with a **masked diffusion head**, inspired by the BAR paper.
+
+- Classical head: outputs `(B, N)` logits for N=1000 classes, inference cost O(N).
+- Masked diffusion head: represents the label as `log2(N)` bits (~10 bits for 1000 classes). Training uses masked diffusion loss; inference is iterative decoding. More robust to large N.
+
+**Phase 1**: Reproduce DeiT-Base baseline → target **81.8% top-1 on ImageNet-1K**.
+**Phase 2**: New branch — implement masked diffusion head, run ablations.
+
+Ablation axes for Phase 2:
+1. Different masked diffusion head implementations
+2. Sampling strategy / number of sampling steps
+3. Training-time mask ratio sampling schedule
+4. Training duration (may need longer)
+
+---
+
+## Codebase Overview
+
+- **Framework**: JAX + Flax + Optax. NOT PyTorch.
+- **Model**: `models.py` — `ViT` class, `ViT_base` partial. The cls token's output goes through `final_ln → fc (logit head)`.
+- **Training loop**: `train.py` — `train_and_evaluate()`. Uses `jax.pmap` over devices.
+- **Config system**: `configs/default.py` (ml_collections). Loaded via `configs/load_config.py`.
+- **Entry point**: `main.py` — calls `train.train_and_evaluate`.
+- **Data**: ImageNet at `/kmh-nfs-ssd-us-mount/data/imagenet`. Input pipeline in `input_pipeline.py`.
+- **Logging**: WandB (configured in config). Also local logs.
+
+Key config fields (see `configs/default.py`):
+- `model = 'ViT_base'`
+- `learning_rate = 0.0005`, scaled as `lr * batch_size / 512`
+- `num_epochs = 330`, `warmup_epochs = 5`
+- `batch_size = 1024`
+- `optimizer = 'adamw'`, `weight_decay`, `stochastic_depth_rate`
+- `dataset.use_rand_augment`, `dataset.use_mixup_cutmix`, `dataset.label_smoothing`
+
+Differences from reference DeiT-Base (tracked in `report_deit_base.md`):
+- `qkv_bias = True`, `out_proj bias = True` (in Attention, currently biases are disabled — check!)
+- LayerNorm: scale only, no bias
+- Learned scaling in residual connections (non-standard — this might be a deviation worth checking)
+- Stochastic depth: default 0.1
+- cls token init: `truncated_normal(0.02)`
+
+---
+
+## Infrastructure: How to Run Experiments
+
+### Find available TPUs
+```bash
+tou
+```
+Constraint: only use **v5p ≤ 64** or **v6e ≤ 32** chips.
+
+### Launch a job
+```bash
+ftmd <ka> <alias>
+tpu run <ka> sqa dir=7
+```
+- `ftmd` = `tpu zhan $ka sqa && tpu fang $ka $alias && tmd $alias` (claims TPU, sets alias, mounts disk)
+- `dir=7` is the index for this DeiT directory (verify with `tpu ls sqa`; use `tpu set-cur <idx> sqa` to set if needed — **don't overwrite**)
+- Job runs from staged code in `/kmh-nfs-ssd-us-mount/staging/sqa/...`
+
+### Monitor jobs
+```bash
+tcs            # = tpu check sqa — shows all job statuses
+tms            # = tpu monitor sqa col=2
+```
+- If a job errored due to **code bug**: fix and relaunch.
+- If a job errored due to **preemption**: do nothing. Auto-resume script handles it (`/kmh-nfs-ssd-us-mount/code/qiao/work/tpu_manager/MONITOR.py`). **Do not touch resume logic.**
+
+### View logs
+- Each job has a tmux window `sqa:<window_id>`.
+- Logdir is at `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/...` (TASKNAME from config.sh is currently "paligemma-baseline" — probably should be updated for DeiT).
+- Stagedir is under `/kmh-nfs-ssd-us-mount/staging/sqa/`.
+- Use `cl` alias (opens logfile in vscode) or read the log files directly.
+
+### Config override at launch
+Configs are passed as `--config=configs/load_config.py:remote_run` plus extra `--config.key=value` overrides.
+
+### Run multiple jobs in parallel
+Recommended when multiple TPUs are available. Typical hyperparam search: double LR each step (don't over-tune).
+
+---
+
+## Workflow for Phase 2 (New Feature)
+
+1. Create a new git branch (or copy the folder).
+2. Modify `models.py`: replace `self.fc = special_linear(num_classes)` and the final `self.fc(x)` call with the masked diffusion head.
+3. Modify `train.py`: replace `categorical_cross_entropy_loss` with masked diffusion loss; add iterative decoding for eval.
+4. Add new config fields as needed.
+5. Run baseline check first (does it train at all?), then ablations.
+
+---
+
+## Record-Keeping
+
+After each experiment completes:
+- Record results + WandB link in `agents/results.md`.
+- Plan next jobs based on findings.
+
+---
+
+## Research Cycle (每次醒来必须执行)
+
+1. **重新读本文件** (防止忘记初心)
+2. **检查 job 状态**: `python /kmh-nfs-ssd-us-mount/code/hanhong/miniforge3/bin/python /home/jzc/zhichengjiang/working/xibo_tpu_manager/tpu.py check sqa` → grep for "DeiT" / relevant jobs
+3. **读最新日志**: `python /kmh-nfs-ssd-us-mount/code/qiao/work/tpu_manager/see_log.py <window_id>` → 得到 logdir → `grep "eval_accuracy\|eval epoch\|Error" <logdir>/output.log`
+4. **整理进度**: 把最新 eval 结果记到 `agents/results.md`
+5. **如果有 job error**: 看日志判断是代码 bug 还是 preempt；preempt 不用管
+6. **规划下一步**: 根据当前结果决定是否启动新实验
+7. **找空闲卡**: `python /kmh-nfs-ssd-us-mount/code/qiao/work/tpu_dls/wrap_master.py` → grep IDLE，只用 v5p≤64 或 v6e≤32
+8. **启动新实验**:
+   - `ftmd <full_tpu_name> <alias>` （ftmd 在 ~/.bashrc 里，需要 source ~/.bash_aliases 才能用）
+   - 等几秒后 `tpu run <full_tpu_name> sqa dir=7 --config.xxx=yyy`
+   - alias 格式: asia-northeast1-b 的 v6e-8 用 `v6e-8-tmp201~208`（已用: 201=vgda24, 202=axuxm0当前job）
+9. **更新 results.md** 记录 WandB link、实验 tag、结果
+
+## Phase 1 Status (Baseline Reproduction)
+
+目标: DeiT-Base 81.8% top-1 on ImageNet-1K, 330 epochs.
+
+| Run | Window | Model | biases | LearnedScale | Status |
+|-----|--------|-------|--------|--------------|--------|
+| baseline | 6323 | ViT_base | False | True (1e-4) | Running, ep~70, eval@59=60.6% |
+| fixed-arch | TBD | ViT_base_v2 | True | False | Planned |
+| bias+ls | TBD | ViT_base_v3 | True | True | Planned |
+
+架构差异 (vs reference DeiT-B):
+- **Missing**: Q/K/V/out_proj biases (`use_bias=False`) → Reference has these
+- **Missing**: LayerNorm bias (`use_bias=False`) → Reference has this
+- **Extra**: LearnedScale (LayerScale) at 1e-4 → NOT in DeiT, from CaiT paper
+- MLP: has bias ✓, attn_dim: 768 ✓, stochastic_depth: 0.1 ✓
+
+---
+
+## Constraints and Gotchas
+
+- **Do not modify resume logic** in `tpu_manager/MONITOR.py` or related scripts.
+- **Do not run `tpu set-cur` carelessly** — dir=7 is the DeiT directory index, don't overwrite.
+- **Only v5p ≤ 64 or v6e ≤ 32** TPUs are allowed.
+- The `label_smoothing` in `train_step_sqa` is hardcoded to `0.0` (line ~333 in train.py) — if you want to change it, pass it through the pmap partial, don't just set it in config.
+- `grad_norm_clip` in AdamW currently asserts it must be `None` — don't set it.
+- The current `Attention` class has `use_bias=False` for Q/K/V/out_proj — but the report says `qkv_bias = True`. This is a known discrepancy to track.
+- `Layer` has `learned_scale1/2` initialized to `1e-4` (non-standard LayerScale). This is already implemented.
