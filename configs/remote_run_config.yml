@@ -1,19 +1,20 @@
-# Mirrors the legacy launch shell (DeiT ViT-base, ImageNet, TPU).
-# Original: batch=1024 lr=5e-4 ep=330 wd=0.05 label_smoothing=0.1
-#           rand-aug + repeated-aug=3 + mixup/cutmix + stoch-depth=0.1
+# Phase 2 Run C: masked diffusion head, no mixup (fix), uniform mask schedule
+# Backbone: ViT_base_mdh (biases+LS+diffusion head)
+# Key fix: mixup/cutmix is skipped in training loop for diffusion
+# Eval: single-step greedy + 4-step iterative decode
 
-model: ViT_base
+model: ViT_base_mdh
 
 dataset:
     num_workers: 16
     prefetch_factor: 4
 
-    # rand-augment / random erasing
+    # rand-augment / random erasing (kept for image augmentation)
     use_rand_augment: true
     rand_augment: rand-m9-mstd0.5-inc1
     reprob: 0.25
 
-    # mixup / cutmix
+    # mixup / cutmix — kept in config but skipped by training loop for diffusion
     use_mixup_cutmix: true
     mixup_prob: 1.0
     switch_prob: 0.5
@@ -22,18 +23,27 @@ dataset:
 
     repeated_aug: 3
     label_smoothing: 0.1
-    num_tpus: 32
+    num_tpus: 8
 
 batch_size: 1024
 learning_rate: 0.0005
-num_epochs: 330        # with repeated-aug=3, ~= 110 effective epochs + 10 cooldown
+num_epochs: 330
 log_per_step: 100
 
 optimizer: adamw
 weight_decay: 0.05
+adamw_b2: 0.95
 dropout_rate: 0.0
 stochastic_depth_rate: 0.1
 grad_norm_clip: null
+
+# Phase 2 diffusion head settings
+use_diffusion_head: true
+head_inner_dim: 256
+head_n_layers: 2
+head_n_heads: 4
+mask_schedule: uniform
+eval_iter_steps: 4
 
 logging:
     use_wandb: True
@@ -42,5 +52,6 @@ logging:
     wandb_tags:
         - sqa
         - deit
-        - vit-base
-    wandb_notes: "deit baseline (ViT-base, b1024, lr5e-4, ep330)"
+        - phase2
+        - masked-diffusion
+    wandb_notes: "phase2-mdh-no-mixup-uniform-C"
