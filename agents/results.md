@@ -26,7 +26,8 @@
   | 199   | 68.07%       | ✅ steady growth (+1.27%) |
   | 219   | 68.40%       | ✅ continued growth (+0.33%) |
   | 239   | 68.98%       | ✅ steady growth (+0.58%) |
-- **Status**: Running (ep=240 as of 2026-05-08 19:41)
+  | 259   | **69.726%**  | ✅ continued growth (+0.75%) |
+- **Status**: Running (ep=260 as of 2026-05-08 21:49)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260507_182637_7910jh_kmh-tpuvm-v6e-8-spot-gzy-axuxm0_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -49,7 +50,8 @@
   | 119   | 62.05%       | partial recovery but still lagging |
   | 139   | 63.01%       | ✅ continuing to recover (+0.96%) |
   | 159   | 64.08%       | ✅ solid jump (+1.07%) |
-- **Status**: Running (ep=160 as of 2026-05-08 19:40)
+  | 179   | 63.032%      | ⚠️ DIP — dropped from ep=159 (no LS instability?) |
+- **Status**: Running (ep=180 as of 2026-05-08 21:47)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_023930_kq4hfm_kmh-tpuvm-v6e-8-spot-gzy-p1u4mx_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -72,7 +74,7 @@
   | 119   | 64.69%       | ✅ now AHEAD of v1 (64.42%) at same epoch |
   | 139   | 64.68%       | ✅ essentially flat (v1 had dip to 63.9% here) |
   | 159   | **65.86%**   | ✅ +1.18% jump — now LEADING all runs at ep=159 |
-- **Status**: Running (ep~160; ep=179 eval pending)
+- **Status**: Running (ep~160; ep=179 eval pending ~23:47)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -80,24 +82,26 @@
 ## Ablation Matrix
 | Run | qkv_bias | ln_bias | LearnedScale | ep19  | ep39   | ep59  | ep79  | ep99  | ep119 | ep139 | ep159 | ep179 | ep199 | ep239 | ep330 |
 |-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
-| 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | **68.98%** | TBD |
-| 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | **64.08%** | TBD   | TBD   | TBD   | TBD |
+| 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | 68.98% | **69.73%** | TBD |
+| 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | **63.03%**⚠️| TBD   | TBD   | TBD |
 | 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | **65.86%**✅ | TBD   | TBD   | TBD   | TBD |
 
 **Ranking at ep=159**: v3(65.86%) > v1(65.41%) > v2(64.08%) — v3 is the best backbone
-- **Run 1 ep=239 = 68.98%**: steady growth, on track for ~81% final.
-- **Run 2 ep=159 = 64.08%**: still lagging behind v1/v3.
-- **Run 3 ep=159 = 65.86%**: ✅ NOW LEADING — best Phase 1 result at this epoch.
+- **Run 1 ep=259 = 69.73%**: steady growth, on track for ~81% final.
+- **Run 2 ep=179 = 63.03%**: ⚠️ DROPPED from 64.08% — no LS causes instability around ep=160-180. Likely temporary recovery ahead.
+- **Run 3 ep=159 = 65.86%**: ✅ LEADING — ep=179 eval pending.
 - **Key conclusion**: v3 (biases+LS) is the best Phase 1 backbone — more stable than v1, significantly ahead of v2.
 
 **⚠️ Run 1 plateau RESOLVED**: 64.4%→64.4%→63.9%→**65.41%**→**66.80%**→**68.07%** (ep99→119→139→159→179→199)
 
 ## TODO / Next Steps
-- Run 1: ep=259 next eval (~21:40)
-- Run 2: ep=179 next eval (~21:40)
-- Run 3: ep=159 eval pending ~20:00; ep=179 ~21:00
-- **Phase 2 Run A** (6352): ep=59 eval ~21:40
-- **Phase 2 Run B** (6349): ep=59 eval ~20:42
+- Run 1: ep=279 next eval (~23:49)
+- Run 2: ep=199 next eval (~23:47) — watch for recovery from ep=179 dip
+- Run 3: ep=179 eval pending (~23:47)
+- **Phase 2 Run A** (6352): ep=79 eval ~23:47
+- **Phase 2 Run B** (6349): preempted at ep~52.8; auto-resume in progress
+- **Phase 2 Runs C/D**: ep=19 eval ~23:30 (C), ~23:37 (D) — first real learning signal
+- **train_loss fix**: committed (2eb25cc); Runs C/D will pick it up on next resume
 - **Phase 2 Run C**: BLOCKED — need user to register yq00yh in spreadsheet
 - **Phase 2 Run D**: PLANNED — logit-normal mask schedule
 
@@ -119,8 +123,11 @@
 - **Loss** = binary cross-entropy averaged over all bits (all-masked input). Random baseline = **0.693** (-log 0.5).
 - The eval uses single-step greedy decoding from fully-masked input (`masked_bits=None` → defaults to all-masked).
 - Expect very slow early improvement vs CE — diffusion has sparser gradient signal. EP=39 will be more informative.
-- ⚠️ **Concern at ep=19**: Run B loss flat (0.685→0.689). 
-- ✅ **Confirmed learning at ep=39**: Run B loss 0.689→**0.667**, accuracy 0.134%→**0.516%** (3.85x). Run A loss 0.687→**0.664**, accuracy 0.186%→**0.524%** (2.82x). Both diffusion heads learn, but ~30 epochs warmup. Run A (b2=0.95) slightly outperforms Run B (b2=0.999) at ep=39.
+- ✅ **Confirmed learning at ep=39**: Run A/B ~0.52% (5x from ep=0). Run A at ep=59: **2.318%** (4.4x from ep=39) — ACCELERATING.
+- ✅ **Approach is NOT fundamentally broken**: trajectory 0.13%→0.19%→0.52%→**2.32%** shows accelerating growth.
+- ⚠️ **train_loss was not logged** (fix committed 2eb25cc): loss computed but dropped from metrics dict. Now fixed.
+- **Training-eval mismatch**: train with partial masks (avg 50% masked), eval from all-masked. Warmup ~30 epochs before learning kicks in. Normal.
+- **invalid_rate interpretation**: logged as percentage (0.286% for Run D at ep=0), NOT 28.6%. Both C/D well below random 2.34%.
 
 ### Run A — ViT_base_mdh (baseline diffusion head, b2=0.95)
 - **Window**: 6352
@@ -136,7 +143,8 @@
   | 0     | 0.132%       | 0.686     | random baseline |
   | 19    | 0.186%       | 0.687     | ✅ +41% relative — small but positive signal |
   | 39    | **0.524%**   | **0.664** | ✅ LEARNING — 3.97x jump from ep=19; slightly beats Run B |
-- **Status**: ✅ Running (ep~57 as of 2026-05-08 21:36; ep=59 eval pending ~21:41)
+  | 59    | **2.318%**   | **0.636** | ✅ BIG JUMP — 4.4x from ep=39; accelerating learning |
+- **Status**: ✅ Running (ep~60 as of 2026-05-08 21:47; ep=79 eval ~23:47)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_152809_369ujx_kmh-tpuvm-v6e-8-spot-gzy-c8umw4_us-east5-b__b_lr_ep_eval`
 ### Run B — ViT_base_mdh (b2=0.999)
 - **Window**: 6349
