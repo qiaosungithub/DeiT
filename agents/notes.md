@@ -144,7 +144,7 @@ After each experiment completes:
 
 ## Constraints and Gotchas
 
-- **DeiT 同时使用 TPU 不能超过 5 个**（跨所有 DeiT 实验，包括 v2/v3/baseline 所有 job）。
+- **DeiT 同时使用 TPU 不能超过 8 个**（跨所有 DeiT 实验，包括 v2/v3/baseline 所有 job）。用户已将限制从5提升到8。
 - **Checkpoint 保存时可能出现假 Error**：tcs 把 checkpoint log 里某些打印判定为 error，其实是正常的。每次醒来检查 Error 时要看实际 log，判断是真 code error 还是假 error。
 - **清理无用 window**：如果一个 window 有明显 error 且已修复重跑，用 `tmux kill-window -t sqa:<window_id>` 关掉旧 window。
 - **循环间隔：每 30 分钟醒一次**。
@@ -159,4 +159,8 @@ After each experiment completes:
 - mount-disk lock file: `/tmp/xibo_mount_<tpu_name>.lock` — if stale, delete it and retry.
 - wandb `set_wandb` step may fail with local Python env issues (missing `annotated_types`) — this is non-critical, training still works.
 - **AdamW b2 = 0.95 (not 0.999)**: hardcoded in original code; now configurable via `--config.adamw_b2=0.999`. Reference DeiT uses b2=0.999. This may cause slight divergence from reference trajectory. When launching new runs, consider testing b2=0.999.
-- **Registered v6e-8 aliases**: only v6e-8-tmp201~203 point to available gzy TPUs (201=j3rqvs, 202=axuxm0, 203=p1u4mx). v6e-8-tmp204 maps to an xtiange TPU (don't claim). v6e-8-tmp205~208 are NOT registered. Currently only 3 v6e-8 slots available; to launch a 4th DeiT run, need to wait for a current run to free up or ask user to register a new alias.
+- **Registered v6e-8 aliases**:
+  - asia-northeast1-b: v6e-8-tmp201→j3rqvs, v6e-8-tmp202→axuxm0, v6e-8-tmp203→p1u4mx
+  - us-east5-b: v6e-8-tmp51→c8umw4 (Phase 2 Run A), v6e-8-tmp52→cz2ivo (Phase 2 Run B)
+  - **Alias convention**: asia-northeast1-b → tmp201+; us-east5-b → tmp51+. ALWAYS check zone before picking alias range.
+  - `tpu register` (interactive, no args) only writes data.json — does NOT write to spreadsheet. Let user handle registration.

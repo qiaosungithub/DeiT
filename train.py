@@ -293,7 +293,9 @@ def train_step_diffusion(state, batch, rng_init, learning_rate_fn, mask_schedule
   pred_classes = diffusion_decode_greedy(logits)                  # (B,)
   true_classes = models.bits_to_class(bits)                       # (B,)
   accuracy = (pred_classes == true_classes).astype(jnp.float32)
-  metrics = {'accuracy': accuracy, 'lr': lr}
+  loss_global = lax.pmean(aux[0], axis_name='batch')              # global mean loss
+  metrics = {'accuracy': accuracy, 'lr': lr,
+             'loss': jnp.full_like(accuracy, loss_global)}
   metrics = lax.all_gather(metrics, axis_name='batch')
   metrics = jax.tree.map(lambda x: x.flatten(), metrics)
 
