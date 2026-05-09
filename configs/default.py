@@ -71,6 +71,8 @@ def get_config():
   config.eval_iter_steps = 4         # iterative decode steps in eval
   config.head_type = 'attention'     # 'attention' | 'mlp'
   config.head_zero_init_proj = False  # zero-init final projection layer of diffusion head
+  config.head_aux_ce = False          # auxiliary CE head alongside diffusion head
+  config.aux_ce_loss_weight = 0.1     # weight for auxiliary CE loss (when head_aux_ce=True)
 
   config.logging = logging = ml_collections.ConfigDict()
   logging.wandb_project = ''

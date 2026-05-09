@@ -237,6 +237,7 @@ class ViT(nn.Module):
     head_n_heads: int = 4
     head_type: str = 'attention'   # 'attention' | 'mlp'
     head_zero_init_proj: bool = False  # zero-init final projection layer
+    head_aux_ce: bool = False         # add auxiliary CE head alongside diffusion head
 
     def setup(self):
         image_size = self.image_size
@@ -272,6 +273,8 @@ class ViT(nn.Module):
                 n_layers=self.head_n_layers,
                 zero_init_proj=self.head_zero_init_proj,
             )
+            if self.head_aux_ce:
+                self.fc = special_linear(num_classes, use_bias=True)
         else:
             self.diffusion_head = MaskedDiffusionHead(
                 n_bits=self.n_bits,
@@ -281,6 +284,8 @@ class ViT(nn.Module):
                 n_heads=self.head_n_heads,
                 zero_init_proj=self.head_zero_init_proj,
             )
+            if self.head_aux_ce:
+                self.fc = special_linear(num_classes, use_bias=True)
 
     def encode(self, x: jnp.ndarray, rng, train=True):
         """Return CLS token embedding (before head)."""
@@ -294,8 +299,7 @@ class ViT(nn.Module):
             x = ly(x, rng=rng, training=train); rng = zr.next(rng)
         return self.final_ln(x[:, 0])  # (B, embed_dim)
 
-    def __call__(self, x:jnp.ndarray, rng, train=True, masked_bits=None):
-        # print('In model: training is ', training)
+    def __call__(self, x:jnp.ndarray, rng, train=True, masked_bits=None, return_aux_ce=False):
         # x.shape: [B, H, W, C]
         cls = self.encode(x, rng, train)
         if not self.use_diffusion_head:
@@ -303,7 +307,10 @@ class ViT(nn.Module):
         else:
             if masked_bits is None:
                 masked_bits = jnp.full((x.shape[0], self.n_bits), 2)
-            return self.diffusion_head(cls, masked_bits)
+            diff_logits = self.diffusion_head(cls, masked_bits)
+            if return_aux_ce and self.head_aux_ce:
+                return diff_logits, self.fc(cls)
+            return diff_logits
 
 ViT_base = partial(
     ViT,
@@ -449,6 +456,30 @@ ViT_base_mdh_large = partial(
     head_inner_dim=512,
     head_n_layers=4,
     head_n_heads=8,
+)
+
+# Phase 2 Run H: attention head + auxiliary CE loss (λ=0.1 by default)
+ViT_base_mdh_aux_ce = partial(
+    ViT,
+    channels=3,
+    image_size=224,
+    patch_size=16,
+    num_classes=1000,
+    embed_dim=768,
+    n_layers=12,
+    heads=12,
+    linear_dim=3072,
+    attn_dim=768,
+    dropout_rate=0,
+    use_qkv_bias=True,
+    use_ln_bias=True,
+    use_layer_scale=True,
+    use_diffusion_head=True,
+    n_bits=NUM_BITS,
+    head_inner_dim=256,
+    head_n_layers=2,
+    head_n_heads=4,
+    head_aux_ce=True,
 )
 
 ViT_debug = partial(

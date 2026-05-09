@@ -249,7 +249,7 @@ def eval_step_agg(state, batch):
   return lax.psum(stats, axis_name='batch')
 
 
-def train_step_diffusion(state, batch, rng_init, learning_rate_fn, mask_schedule='uniform'):
+def train_step_diffusion(state, batch, rng_init, learning_rate_fn, mask_schedule='uniform', aux_ce_loss_weight=0.0):
   """Training step for masked diffusion head."""
   rng_step = random.fold_in(rng_init, state.step)
   rng_device = random.fold_in(rng_step, lax.axis_index(axis_name='batch'))
@@ -272,14 +272,22 @@ def train_step_diffusion(state, batch, rng_init, learning_rate_fn, mask_schedule
     bit_mask = (random.uniform(rng_b, (B, n_bits)) < t).astype(jnp.float32)
     masked_bits = jnp.where(bit_mask.astype(bool), 2, bits).astype(jnp.int32)
 
-    logits, new_model_state = state.apply_fn(
+    out = state.apply_fn(
       {'params': params, 'batch_stats': state.batch_stats},
       batch['image'],
       mutable=['batch_stats'],
       rng=rng_dropout,
       masked_bits=masked_bits,
+      return_aux_ce=(aux_ce_loss_weight > 0.0),
     )
-    loss = masked_diffusion_loss(logits, bits, bit_mask)
+    if aux_ce_loss_weight > 0.0:
+      (logits, ce_logits), new_model_state = out
+      diff_loss = masked_diffusion_loss(logits, bits, bit_mask)
+      ce_loss = jnp.mean(optax.softmax_cross_entropy(logits=ce_logits, labels=labels_soft))
+      loss = diff_loss + aux_ce_loss_weight * ce_loss
+    else:
+      logits, new_model_state = out
+      loss = masked_diffusion_loss(logits, bits, bit_mask)
     return loss, (new_model_state, logits, bits, bit_mask)
 
   step = state.step
@@ -500,6 +508,7 @@ def train_and_evaluate(
     head_n_heads=config.get('head_n_heads', 4),
     head_type=config.get('head_type', 'attention'),
     head_zero_init_proj=config.get('head_zero_init_proj', False),
+    head_aux_ce=config.get('head_aux_ce', False),
   )
 
   learning_rate_fn = create_learning_rate_fn(config, base_learning_rate, steps_per_epoch)
@@ -521,7 +530,8 @@ def train_and_evaluate(
     donate_argnums=(0, 1),
   ) if not use_diffusion_head else jax.pmap(
     functools.partial(train_step_diffusion, rng_init=rng, learning_rate_fn=learning_rate_fn,
-                      mask_schedule=config.get('mask_schedule', 'uniform')),
+                      mask_schedule=config.get('mask_schedule', 'uniform'),
+                      aux_ce_loss_weight=config.get('aux_ce_loss_weight', 0.0)),
     axis_name='batch',
     donate_argnums=(0, 1),
   )

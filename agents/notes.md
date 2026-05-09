@@ -162,13 +162,14 @@ After each experiment completes:
 - **Registered v6e-8 aliases**:
   - asia-northeast1-b: v6e-8-tmp201→j3rqvs, v6e-8-tmp202→axuxm0, v6e-8-tmp203→p1u4mx
   - us-east5-b: v6e-8-tmp51→c8umw4 (Phase 2 Run A), v6e-8-tmp52→cz2ivo (Phase 2 Run B), v6e-8-tmp53→8507kk (Run D), v6e-8-tmp205/206→yq00yh (Run C)
-  - asia-northeast1-b (new): v6e-8-tmp207→i91hh1 (Run E), v6e-8-tmp208→3djlis (Run F), v6e-8-tmp209→06q7u9 (Run G)
+  - asia-northeast1-b (new): v6e-8-tmp207→i91hh1 (Run E), v6e-8-tmp208→3djlis (Run F), v6e-8-tmp209→06q7u9 (Run G), v6e-8-tmp210→qxxa8y (Run H)
   - **Alias convention**: asia-northeast1-b → tmp201+; us-east5-b → tmp51+. ALWAYS check zone before picking alias range.
   - `tpu register` (interactive, no args) only writes data.json — does NOT write to spreadsheet. Let user handle registration.
-  - **All Run E/F/G aliases registered** in data.json. User needs to: `ftmd <full_tpu_name> <alias> && tpu run <full_tpu_name> sqa dir=7 --config=configs/load_config.py:<mode>`
+  - **All Run E/F/G/H aliases registered** in data.json. User needs to: `ftmd <full_tpu_name> <alias> && tpu run <full_tpu_name> sqa dir=7 --config=configs/load_config.py:<mode>`
   - Run E: `ftmd kmh-tpuvm-v6e-8-spot-gzy-i91hh1 v6e-8-tmp207 && tpu run kmh-tpuvm-v6e-8-spot-gzy-i91hh1 sqa dir=7 --config=configs/load_config.py:remote_run_E`
   - Run F: `ftmd kmh-tpuvm-v6e-8-spot-gzy-3djlis v6e-8-tmp208 && tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.py:remote_run`
   - Run G: `ftmd kmh-tpuvm-v6e-8-spot-gzy-06q7u9 v6e-8-tmp209 && tpu run kmh-tpuvm-v6e-8-spot-gzy-06q7u9 sqa dir=7 --config=configs/load_config.py:remote_run_G`
+  - Run H: `ftmd kmh-tpuvm-v6e-8-spot-gzy-qxxa8y v6e-8-tmp210 && tpu run kmh-tpuvm-v6e-8-spot-gzy-qxxa8y sqa dir=7 --config=configs/load_config.py:remote_run_H`
 
 ## Critical Bugs Found and Fixed (2026-05-09)
 
@@ -176,16 +177,17 @@ After each experiment completes:
 - **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
 - **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
 
-## Phase 2 Progress Summary (as of 2026-05-09 ~04:10)
+## Phase 2 Progress Summary (as of 2026-05-09 ~04:50)
 
 | Run | Architecture | ep | single-step | iter | notes |
 |-----|-------------|-----|-------------|------|-------|
-| A | attention head, mixup BUG | 120 | ~20%? | N/A | old code; ep=119=17.95%, ep=139 upcoming |
-| C | attention head, uniform | 66 | ~11%? | ~17%? | LEADING; ep=59=9.18%/14.04%; ep=79 upcoming |
-| D | attention head, logit-normal | 65 | ~10%? | ~15%? | ep=59=8.46%/12.46%; behind C |
-| E | attention head, zero-init | TBD | TBD | TBD | i91hh1 MOUNTED+IDLE; user needs ftmd+tpu_run |
-| F | MLP head baseline | TBD | TBD | TBD | config ready; need slot (7/8 used) |
-| G | large head (512-dim, 4L) | TBD | TBD | TBD | config ready; need slot |
+| A | attention head, mixup BUG | 120 | ~20%? | N/A | ep=119=17.95%; ep=139 upcoming |
+| C | attention head, uniform | 72 | ~11%? | ~17%? | LEADING; ep=59=9.18%/14.04%; ep=79 upcoming |
+| D | attention head, logit-normal | 71 | ~10%? | ~15%? | ep=59=8.46%/12.46%; behind C |
+| E | attention head, zero-init | TBD | TBD | TBD | alias registered; user needs ftmd+tpu_run |
+| F | MLP head baseline | TBD | TBD | TBD | alias registered; need slot (6/8 used; Run1 finishing) |
+| G | large head (512-dim, 4L) | TBD | TBD | TBD | alias registered; need slot |
+| H | attention + aux CE (λ=0.1) | TBD | TBD | TBD | NEW — alias registered; need slot |
 
-**Key trajectory (Run A, old-code baseline)**: ep79=5.78% → ep99=12.21% → ep119=17.95% → still accelerating
-**Key trajectory (Run C, fixed-code)**: ep39=2.12% → ep59=9.18% — much faster, next check ep=79
+**Phase 1 Run 1**: ep=326/330 — finishing in ~20min; axuxm0 slot will be free
+**Run H (new)**: implemented auxiliary CE loss alongside diffusion loss — hypothesis: stronger backbone gradient early in training
