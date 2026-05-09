@@ -161,6 +161,22 @@ After each experiment completes:
 - **AdamW b2 = 0.95 (not 0.999)**: hardcoded in original code; now configurable via `--config.adamw_b2=0.999`. Reference DeiT uses b2=0.999. This may cause slight divergence from reference trajectory. When launching new runs, consider testing b2=0.999.
 - **Registered v6e-8 aliases**:
   - asia-northeast1-b: v6e-8-tmp201→j3rqvs, v6e-8-tmp202→axuxm0, v6e-8-tmp203→p1u4mx
-  - us-east5-b: v6e-8-tmp51→c8umw4 (Phase 2 Run A), v6e-8-tmp52→cz2ivo (Phase 2 Run B)
+  - us-east5-b: v6e-8-tmp51→c8umw4 (Phase 2 Run A), v6e-8-tmp52→cz2ivo (Phase 2 Run B), v6e-8-tmp53→8507kk (Run D), v6e-8-tmp205/206→yq00yh (Run C)
   - **Alias convention**: asia-northeast1-b → tmp201+; us-east5-b → tmp51+. ALWAYS check zone before picking alias range.
   - `tpu register` (interactive, no args) only writes data.json — does NOT write to spreadsheet. Let user handle registration.
+  - **Next available alias**: v6e-8-tmp207 for i91hh1 (asia-northeast1-b, Run E)
+
+## Critical Bugs Found and Fixed (2026-05-09)
+
+- **`class ViT(nn.Module):` was missing** (commit e54ec1c accidentally dropped it when inserting MLPDiffusionHead). The fields appeared as part of MLPDiffusionHead class body, causing NameError on import. Fix: add `class ViT(nn.Module):` before `channels: int` field. **Always check after adding a new class above ViT.**
+- **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
+- **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
+
+## Phase 2 Progress Summary (as of 2026-05-09 ~03:00)
+
+| Run | Architecture | ep | single-step | iter | notes |
+|-----|-------------|-----|-------------|------|-------|
+| A | attention head, mixup BUG | 99 | **12.21%** | N/A | learning fast despite old code |
+| C | attention head, no-mixup | 52 | ~est 6-9% | ~est 12-18% | fixed code, 4x ahead of A at ep=39 |
+| D | attention head, logit-normal | 51 | ~est 6-9% | ~est 12-18% | slightly ahead of C at ep=39 |
+| E | attention head, zero-init | TBD | TBD | TBD | READY TO LAUNCH |
