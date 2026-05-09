@@ -224,7 +224,8 @@
   | 59    | **8.456%**   | **0.591** | **12.456%**       | 2.702%            | ⚠️ now BEHIND C (9.18%/14.04%) — uniform schedule overtook logit-normal |
   | 79    | **15.706%**  | **0.548** | **21.532%**       | 0.858%            | ⚠️ still behind C (17.94%/23.92%) — gap widening; uniform schedule consistently better |
   | 99    | **22.842%**  | **0.512** | **29.124%**       | 2.104%            | ⚠️ behind C (26.15%/32.56%) by 3.3%/3.4% — gap growing vs ep=79 (2.2%/2.4%) |
-- **Status**: ✅ Running (ep=100 as of 2026-05-09 07:45; ep=119 eval upcoming)
+  | 119   | **28.722%**  | **0.482** | **34.980%**       | 2.654%            | ⚠️ behind C (33.28%/39.14%) by 4.6%/4.2% — gap continues to widen; uniform definitively better |
+- **Status**: ✅ Running (ep=120 as of 2026-05-09 09:50; ep=139 eval upcoming)
 
 ### Run E — ViT_base_mdh_zero_init (zero-init out_proj, uniform schedule)
 - **Window**: TBD (not yet launched)
