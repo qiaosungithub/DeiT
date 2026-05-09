@@ -27,7 +27,8 @@
   | 219   | 68.40%       | ✅ continued growth (+0.33%) |
   | 239   | 68.98%       | ✅ steady growth (+0.58%) |
   | 259   | **69.726%**  | ✅ continued growth (+0.75%) |
-- **Status**: Running (ep=260 as of 2026-05-08 21:49)
+  | 279   | **70.300%**  | ✅ continued growth (+0.57%) |
+- **Status**: Running (ep=280 as of 2026-05-09 23:57; ep=299 eval ~01:57)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260507_182637_7910jh_kmh-tpuvm-v6e-8-spot-gzy-axuxm0_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -51,7 +52,8 @@
   | 139   | 63.01%       | ✅ continuing to recover (+0.96%) |
   | 159   | 64.08%       | ✅ solid jump (+1.07%) |
   | 179   | 63.032%      | ⚠️ DIP — dropped from ep=159 (no LS instability?) |
-- **Status**: Running (ep=180 as of 2026-05-08 21:47)
+  | 199   | 63.614%      | partial recovery (+0.58%) but still below ep=159 peak |
+- **Status**: Running (ep=200 as of 2026-05-08 23:54; ep=219 eval ~01:54)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_023930_kq4hfm_kmh-tpuvm-v6e-8-spot-gzy-p1u4mx_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -75,33 +77,35 @@
   | 139   | 64.68%       | ✅ essentially flat (v1 had dip to 63.9% here) |
   | 159   | **65.86%**   | ✅ +1.18% jump — now LEADING all runs at ep=159 |
   | 179   | 66.348%      | ✅ continued growth (+0.49%) |
-- **Status**: Running (ep~180 as of 2026-05-08 21:54; ep=199 eval ~23:54)
+  | 199   | 66.254%      | ⚠️ slight dip (-0.09%) — essentially flat; v1 gap widening |
+- **Status**: Running (ep=200 as of 2026-05-09 00:01; ep=219 eval ~02:01)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
 
 ## Ablation Matrix
-| Run | qkv_bias | ln_bias | LearnedScale | ep19  | ep39   | ep59  | ep79  | ep99  | ep119 | ep139 | ep159 | ep179 | ep199 | ep239 | ep330 |
-|-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
-| 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | 68.98% | **69.73%** | TBD |
-| 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | **63.03%**⚠️| TBD   | TBD   | TBD |
-| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | **66.35%**✅ | TBD   | TBD   | TBD |
+| Run | qkv_bias | ln_bias | LearnedScale | ep19  | ep39   | ep59  | ep79  | ep99  | ep119 | ep139 | ep159 | ep179 | ep199 | ep259 | ep279 | ep330 |
+|-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+| 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | 69.73% | **70.30%** | TBD |
+| 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | **63.61%** | TBD | TBD | TBD |
+| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | **66.25%**⚠️ | TBD | TBD | TBD |
 
-**Ranking at ep=179**: v1(66.80%) > v3(66.35%) > v2(63.03%) — v1 retakes lead at ep=179; v3 close
-- **Run 1 ep=259 = 69.73%**: steady growth.
-- **Run 2 ep=179 = 63.03%**: ⚠️ dipped from 64.08% — no LS instability. Watch for recovery at ep=199.
-- **Run 3 ep=179 = 66.35%**: ✅ continued growth; slightly behind Run 1 at same epoch.
+**Ranking at ep=199**: v1(68.07%) >> v3(66.25%) > v2(63.61%) — v1 pulling ahead; v3 plateauing
+- **Run 1 ep=279 = 70.30%**: steady growth, on track for ~81%.
+- **Run 2 ep=199 = 63.61%**: partial recovery from ep=179 dip; still well behind v1/v3.
+- **Run 3 ep=199 = 66.25%**: ⚠️ plateauing (66.35%→66.25%); v1 advantage growing.
+- **Key insight**: biases+LS (v3) leads early but v1 (no biases, LS) pulls ahead by ep=200+.
 
 **⚠️ Run 1 plateau RESOLVED**: 64.4%→64.4%→63.9%→**65.41%**→**66.80%**→**68.07%** (ep99→119→139→159→179→199)
 
 ## TODO / Next Steps
-- Run 1: ep=279 next eval (~23:49)
-- Run 2: ep=199 next eval (~23:47) — watch for recovery from ep=179 dip
-- Run 3: ep=199 next eval (~23:54)
-- **Phase 2 Run A** (6352): ep=79 eval ~23:47
-- **Phase 2 Run B** (6349): preempted at ep~52.8 since 20:03 — auto-resume pending (>2.5hr)
-- **Phase 2 Runs C/D**: ep=19 eval ~23:30 (C), ~23:37 (D)
-- **train_loss fix**: committed (2eb25cc); will appear when Runs C/D resume from new staged code
+- Run 1: ep=299 eval ~01:57
+- Run 2: ep=219 eval ~01:54
+- Run 3: ep=219 eval ~02:01
+- **Phase 2 Run A** (6352): ep=99 eval ~01:52
+- **Phase 2 Run B** (6349): preempted >4hr — spot instance waiting; do not intervene
+- **Phase 2 Run C** (6363): ep=39 eval ~01:30
+- **Phase 2 Run D** (6364): ep=39 eval ~01:37
 - **Phase 2 Run C**: BLOCKED — need user to register yq00yh in spreadsheet
 - **Phase 2 Run D**: PLANNED — logit-normal mask schedule
 
@@ -145,7 +149,8 @@
   | 19    | 0.186%       | 0.687     | ✅ +41% relative — small but positive signal |
   | 39    | **0.524%**   | **0.664** | ✅ LEARNING — 3.97x jump from ep=19; slightly beats Run B |
   | 59    | **2.318%**   | **0.636** | ✅ BIG JUMP — 4.4x from ep=39; accelerating learning |
-- **Status**: ✅ Running (ep~60 as of 2026-05-08 21:47; ep=79 eval ~23:47)
+  | 79    | **5.784%**   | **0.609** | ✅ ACCELERATING — 2.5x from ep=59; steep growth curve |
+- **Status**: ✅ Running (ep~80 as of 2026-05-08 23:52; ep=99 eval ~01:52)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_152809_369ujx_kmh-tpuvm-v6e-8-spot-gzy-c8umw4_us-east5-b__b_lr_ep_eval`
 ### Run B — ViT_base_mdh (b2=0.999)
 - **Window**: 6349
@@ -190,5 +195,9 @@
 - **Architecture**: same as Run C
 - **Key fixes**: no mixup/cutmix, iterative eval (4-step), logit_normal mask schedule, b2=0.95
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_212230_hc12e8_kmh-tpuvm-v6e-8-spot-gzy-8507kk_us-east5-b__b_lr_ep_eval`
-- **Status**: ✅ Running (step=1100, ep~0.88 as of 2026-05-08 21:36; ep=0 eval ~21:38)
-- **Eval checkpoints**: TBD
+- **Status**: ✅ Running (ep~20 as of 2026-05-09 00:01; ep=39 eval ~01:37)
+- **Eval checkpoints**:
+  | epoch | eval_accuracy | eval_loss | eval_accuracy_iter | eval_invalid_rate | notes |
+  |-------|--------------|-----------|-------------------|-------------------|-------|
+  | 0     | 0.130%       | 0.682     | 0.192%            | 0.286%            | near random |
+  | 19    | **0.326%**   | **0.680** | **0.532%**        | 5.120%            | ✅ 2.5x single, 2.8x iter vs ep=0; slightly AHEAD of C (0.282%/0.478%); high invalid rate from logit-normal OOD |
