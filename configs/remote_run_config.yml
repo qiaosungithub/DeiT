@@ -1,8 +1,8 @@
-# Phase 2 Run D: masked diffusion head, no mixup (fix), logit-normal mask schedule
-# logit-normal: t = sigmoid(z*2), z~N(0,1) — concentrates mask ratio near 0.5
-# vs Run C which uses uniform t
+# Phase 2 Run E: MLP baseline — same as Run C but head_type=mlp
+# Ablation: does attention over 10 bits outperform a plain concat MLP?
+# MLP head: cls_proj(256) + bit_emb_flat(10x256=2560) → cat(2816) → GELU(1024) → GELU(1024) → 20 → (10,2)
 
-model: ViT_base_mdh
+model: ViT_base_mdh_mlp
 
 dataset:
     num_workers: 16
@@ -35,10 +35,11 @@ stochastic_depth_rate: 0.1
 grad_norm_clip: null
 
 use_diffusion_head: true
+head_type: mlp
 head_inner_dim: 256
 head_n_layers: 2
 head_n_heads: 4
-mask_schedule: logit_normal
+mask_schedule: uniform
 eval_iter_steps: 4
 
 logging:
@@ -50,4 +51,5 @@ logging:
         - deit
         - phase2
         - masked-diffusion
-    wandb_notes: "phase2-mdh-no-mixup-logit-normal-D"
+        - mlp-head
+    wandb_notes: "phase2-mdh-mlp-baseline-E"

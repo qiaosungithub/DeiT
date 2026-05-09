@@ -171,7 +171,43 @@ class MaskedDiffusionHead(nn.Module):
         return self.out_proj(x[:, 1:, :])                       # (B, n_bits, 2)
 
 
-class ViT(nn.Module):
+class MLPDiffusionHead(nn.Module):
+    """
+    MLP baseline for masked diffusion head.
+    Flattens CLS + all bit embeddings into a single vector, passes through
+    dense layers. No inter-bit attention — tests whether attention buys
+    anything over a plain MLP for 10 bits.
+    """
+    n_bits: int = NUM_BITS
+    embed_dim: int = 768
+    inner_dim: int = 256
+    n_layers: int = 2   # number of hidden MLP layers
+
+    def setup(self):
+        self.cls_proj = special_linear(self.inner_dim)
+        self.bit_emb = nn.Embed(3, self.inner_dim)           # tokens: 0, 1, MASK=2
+        self.bit_pos = self.param('bit_pos', nn.initializers.truncated_normal(0.02),
+                                  (self.n_bits, self.inner_dim))
+        hidden_dim = self.inner_dim * 4                      # 256*4=1024
+        self.hidden_layers = [special_linear(hidden_dim) for _ in range(self.n_layers)]
+        self.out_proj = special_linear(self.n_bits * 2)      # → 20, reshaped to (n_bits, 2)
+
+    def __call__(self, cls_token, masked_bits):
+        """
+        cls_token:   (B, embed_dim)
+        masked_bits: (B, n_bits)  values in {0, 1, 2}
+        Returns:     (B, n_bits, 2) logits
+        """
+        cls = self.cls_proj(cls_token)                       # (B, inner_dim)
+        bits = self.bit_emb(masked_bits) + self.bit_pos      # (B, n_bits, inner_dim)
+        bits_flat = bits.reshape(bits.shape[0], -1)          # (B, n_bits*inner_dim)
+        x = jnp.concatenate([cls, bits_flat], axis=-1)       # (B, (n_bits+1)*inner_dim)
+        for fc in self.hidden_layers:
+            x = nn.gelu(fc(x))
+        x = self.out_proj(x)                                 # (B, n_bits*2)
+        return x.reshape(x.shape[0], self.n_bits, 2)         # (B, n_bits, 2)
+
+
 
     channels: int
     image_size: int
@@ -194,6 +230,7 @@ class ViT(nn.Module):
     head_inner_dim: int = 256
     head_n_layers: int = 2
     head_n_heads: int = 4
+    head_type: str = 'attention'   # 'attention' | 'mlp'
 
     def setup(self):
         image_size = self.image_size
@@ -221,6 +258,13 @@ class ViT(nn.Module):
         self.final_ln = nn.LayerNorm(use_scale=True, use_bias=False,scale_init=nn.initializers.ones)
         if not self.use_diffusion_head:
             self.fc = special_linear(num_classes, use_bias=True)
+        elif self.head_type == 'mlp':
+            self.diffusion_head = MLPDiffusionHead(
+                n_bits=self.n_bits,
+                embed_dim=embed_dim,
+                inner_dim=self.head_inner_dim,
+                n_layers=self.head_n_layers,
+            )
         else:
             self.diffusion_head = MaskedDiffusionHead(
                 n_bits=self.n_bits,
@@ -329,7 +373,28 @@ ViT_base_mdh = partial(
     head_n_heads=4,
 )
 
-ViT_debug = partial(
+# Phase 2: MLP baseline — same backbone as mdh, MLP head instead of attention
+ViT_base_mdh_mlp = partial(
+    ViT,
+    channels=3,
+    image_size=224,
+    patch_size=16,
+    num_classes=1000,
+    embed_dim=768,
+    n_layers=12,
+    heads=12,
+    linear_dim=3072,
+    attn_dim=768,
+    dropout_rate=0,
+    use_qkv_bias=True,
+    use_ln_bias=True,
+    use_layer_scale=True,
+    use_diffusion_head=True,
+    head_type='mlp',
+    n_bits=NUM_BITS,
+    head_inner_dim=256,
+    head_n_layers=2,
+)
     ViT,
     channels=3,
     image_size=224,

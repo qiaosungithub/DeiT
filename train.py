@@ -498,6 +498,7 @@ def train_and_evaluate(
     head_inner_dim=config.get('head_inner_dim', 256),
     head_n_layers=config.get('head_n_layers', 2),
     head_n_heads=config.get('head_n_heads', 4),
+    head_type=config.get('head_type', 'attention'),
   )
 
   learning_rate_fn = create_learning_rate_fn(config, base_learning_rate, steps_per_epoch)
