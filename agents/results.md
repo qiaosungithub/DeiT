@@ -105,7 +105,7 @@
 ## TODO / Next Steps (2026-05-09 05:41)
 - Run 2: ep=260, ep=279 eval upcoming
 - Run 3: ep=260, ep=279 eval upcoming — **70.62% at ep=259, LEADING Run 1!**
-- **Phase 2 Run A** (ep=140): **24.44%** — ep=159 eval upcoming
+- **Phase 2 Run A** (ep=160): **30.56%** — ep=179 upcoming; growth decelerating (1.25x vs 1.36x vs 1.47x)
 - **Phase 2 Run C** (ep=100): **26.15%/32.56%** — ep=119 upcoming; EXCEEDS Run A ep=139!
 - **Phase 2 Run D** (ep=100): **22.84%/29.12%** — ep=119 upcoming; behind C by 3.3pp
 - **Phase 2 Run E**: READY TO LAUNCH — axuxm0 already IDLE+MOUNTED (Run 1 finished)
@@ -160,7 +160,8 @@
   | 99    | **12.212%**  | **0.566** | ✅ ACCELERATING — 2.1x from ep=79; best so far |
   | 119   | **17.948%**  | **0.537** | ✅ ACCELERATING — 1.47x from ep=99; still climbing |
   | 139   | **24.440%**  | **0.502** | ✅ ACCELERATING — 1.36x from ep=119; +6.49% jump |
-- **Status**: ✅ Running (ep=140 as of 2026-05-09 06:12; ep=159 eval upcoming)
+  | 159   | **30.556%**  | **0.467** | ✅ 1.25x from ep=139; +6.1% — growth decelerating |
+- **Status**: ✅ Running (ep=160 as of 2026-05-09 08:20; ep=179 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_152809_369ujx_kmh-tpuvm-v6e-8-spot-gzy-c8umw4_us-east5-b__b_lr_ep_eval`
 ### Run B — ViT_base_mdh (b2=0.999)
 - **Window**: 6349
