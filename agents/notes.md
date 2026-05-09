@@ -177,23 +177,23 @@ After each experiment completes:
 - **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
 - **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
 
-## Phase 2 Progress Summary (as of 2026-05-09 15:14)
+## Phase 2 Progress Summary (as of 2026-05-09 18:21)
 
 | Run | Architecture | ep | single-step | iter | notes |
 |-----|-------------|-----|-------------|------|-------|
-| A | attention head, mixup BUG | 186⚠️ | 37.25% | N/A | ep=179=37.25%; PREEMPTED ~11:07; auto-resume pending |
-| C | attention head, uniform | 134⚠️ | 33.28% | 39.14% | ep=119=33.28%/39.14%; PREEMPTED ~11:07; auto-resume pending |
-| D | attention head, logit-normal | 132⚠️ | 28.72% | 34.98% | ep=119=28.72%/34.98%; PREEMPTED ~11:07; behind C by 4.6pp |
-| E | attention head, zero-init | TBD | TBD | TBD | axuxm0 IDLE+MOUNTED; user needs tpu_run |
-| F | MLP head baseline | TBD | TBD | TBD | 3djlis IDLE+MOUNTED; user needs ftmd+tpu_run |
-| G | large head (512-dim, 4L) | TBD | TBD | TBD | 06q7u9 IDLE+MOUNTED; user needs ftmd+tpu_run |
-| H | attention + aux CE (λ=0.1) | TBD | TBD | TBD | qxxa8y IDLE+MOUNTED; user needs ftmd+tpu_run |
-| I | pretrained backbone + diff head | TBD | TBD | TBD | j3rqvs IDLE+MOUNTED; Phase 1 Run 3 DONE (73.14%); user needs tpu_run |
+| A | attention head, mixup BUG | 186⚠️ | 37.25% | N/A | PREEMPTED ~11:07; auto-resume pending |
+| C | attention head, uniform | 134⚠️ | 33.28% | 39.14% | PREEMPTED ~11:07; auto-resume pending |
+| D | attention head, logit-normal | 132⚠️ | 28.72% | 34.98% | PREEMPTED ~11:07; behind C by 4.6pp |
+| E | attention head, zero-init | - | - | - | axuxm0 IDLE+MOUNTED; needs tpu_run |
+| F | MLP head baseline | - | - | - | 3djlis IDLE+MOUNTED; needs ftmd+tpu_run |
+| G | large head (512-dim, 4L) | - | - | - | 06q7u9 IDLE+MOUNTED; needs ftmd+tpu_run |
+| H | attention + aux CE (λ=0.1) | - | - | - | qxxa8y IDLE+MOUNTED; needs ftmd+tpu_run |
+| I | pretrained backbone + diff head | 0 | - | - | ✅ RUNNING (window 6375, launched 18:17); train_loss=0.692@step100 |
 
-**Phase 1 COMPLETE**: Run 3 (biases+LS) = **73.14%** BEST, Run 1 = 71.96%, Run 2 = 65.96% (no-LS plateau).
-**Run I**: j3rqvs IDLE+MOUNTED. Launch: `tpu run kmh-tpuvm-v6e-8-spot-gzy-j3rqvs sqa dir=7 --config=configs/load_config.py:remote_run_I`
-**Run A/C/D**: Preempted by us-east5-b spot wave (~11:07). Machines deleted. MONITOR.py searching for new spots.
-**Uniform schedule definitively beats logit-normal** (Run C vs D): gap growing each eval (4.6pp at ep=119).
+**Phase 1 COMPLETE**: Run 3 (biases+LS) = **73.14%** BEST, Run 1 = 71.96%, Run 2 = 65.96%.
+**Run I**: ✅ RUNNING on j3rqvs (window 6375). Logdir: `20260509_181720_6b9dpm_...j3rqvs...`
+**Run A/C/D**: Preempted by us-east5-b spot wave (~11:07). Machines deleted. MONITOR.py searching.
+**Uniform schedule definitively beats logit-normal** (Run C vs D): gap 4.6pp at ep=119.
 
 ## New Feature: load_backbone_from (2026-05-09)
 - Config field `load_backbone_from` in default.py

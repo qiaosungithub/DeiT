@@ -247,7 +247,25 @@
 - **Status**: ⏳ READY TO LAUNCH — alias v6e-8-tmp207 registered ✅; user needs to run ftmd+tpu_run
   - Run: `ftmd kmh-tpuvm-v6e-8-spot-gzy-i91hh1 v6e-8-tmp207 && tpu run kmh-tpuvm-v6e-8-spot-gzy-i91hh1 sqa dir=7 --config=configs/load_config.py:remote_run_E`
 
+### Run I — ViT_base_mdh (warm-started from Phase 1 Run 3 backbone)
+- **Window**: 6375
+- **WandB notes**: `phase2-mdh-warm-start-I`
+- **TPU**: kmh-tpuvm-v6e-8-spot-gzy-j3rqvs (asia-northeast1-b), alias v6e-8-tmp201
+- **Branch**: phase2-masked-diffusion (commit e4fd44b)
+- **Config**: `configs/remote_run_I_config.yml`
+- **Architecture**: ViT_base_mdh (biases+LS+diffusion head), warm-started from Phase 1 Run 3 backbone (73.14% CE baseline)
+- **Key change vs Run C**: backbone pre-trained on CE for 329 epochs; diffusion head randomly initialized
+- **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260509_181720_6b9dpm_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
+- **Eval checkpoints**:
+  | epoch | eval_accuracy | eval_loss | eval_accuracy_iter | eval_invalid_rate | notes |
+  |-------|--------------|-----------|-------------------|-------------------|-------|
+- **Status**: ✅ Running (launched 2026-05-09 18:17; window 6375; step=100 confirmed training, train_loss=0.692)
+
 ---
+
+## Code Fixes Applied (2026-05-09) — commits faa44ba, e4fd44b
+- ✅ Fix `aux_ce_loss_weight` gating: was defaulting to 0.1 even when `head_aux_ce=False`, causing ValueError in loss_fn (commit faa44ba)
+- ✅ Fix `load_backbone_params`: preserve FrozenDict types, reinit opt_state from merged params (commit e4fd44b)
 
 ## Code Fixes Applied (2026-05-09) — commit 7cd83ac
 - ✅ Fix: restore missing `class ViT(nn.Module):` declaration (accidentally dropped in e54ec1c when MLPDiffusionHead was added)
