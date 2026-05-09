@@ -29,7 +29,8 @@
   | 259   | **69.726%**  | ✅ continued growth (+0.75%) |
   | 279   | **70.300%**  | ✅ continued growth (+0.57%) |
   | 299   | **71.470%**  | ✅ continued growth (+1.17%) |
-- **Status**: Running (ep=107 as of 2026-05-09 02:46)
+  | 319   | **71.956%**  | ✅ continued growth (+0.49%) |
+- **Status**: ✅ Nearly done — ep=319.96/330 as of 2026-05-09 04:12; final eval at ep=329 upcoming
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260507_182637_7910jh_kmh-tpuvm-v6e-8-spot-gzy-axuxm0_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -82,7 +83,8 @@
   | 179   | 66.348%      | ✅ continued growth (+0.49%) |
   | 199   | 66.254%      | ⚠️ slight dip (-0.09%) — essentially flat; v1 gap widening |
   | 219   | **67.156%**  | ✅ recovery (+0.90%) |
-- **Status**: Running (ep~220 as of 2026-05-09 02:46)
+  | 239   | **68.784%**  | ✅ big jump (+1.63%) |
+- **Status**: Running (ep=239.2 as of 2026-05-09 04:15; ep=259 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -94,10 +96,9 @@
 | 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.36%** | TBD | TBD | TBD |
 | 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | TBD | TBD | TBD | TBD |
 
-**Ranking at ep=219**: v1(TBD) >> v3(67.16%) > v2(64.40%) — v1 likely further ahead
-- **Run 1 ep=299 = 71.47%**: strong growth, on track for 81%+.
-- **Run 2 ep=219 = 64.40%**: recovering; still significantly behind v1/v3.
-- **Run 3 ep=219 = 67.16%**: recovered from plateau; divergence from v1 narrowed but still gap.
+**Ranking at ep=239**: v1(TBD) >> v3(**68.78%**) > v2(65.36%) — Run 3 surging with big ep=239 jump
+- **Run 1 ep=319 = 71.96%**: still growing; final ep=330 eval imminent (finishes in ~30min)
+- **Run 3 ep=239 = 68.78%**: +1.63% jump; now closer to Run 1 pace
 
 ## TODO / Next Steps (2026-05-09)
 - Run 1: ep=299 latest; ep=319 eval upcoming
