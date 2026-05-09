@@ -428,6 +428,29 @@ ViT_base_mdh_mlp = partial(
     head_n_layers=2,
 )
 
+# Phase 2: larger attention head — inner_dim=512, n_layers=4 (more capacity)
+ViT_base_mdh_large = partial(
+    ViT,
+    channels=3,
+    image_size=224,
+    patch_size=16,
+    num_classes=1000,
+    embed_dim=768,
+    n_layers=12,
+    heads=12,
+    linear_dim=3072,
+    attn_dim=768,
+    dropout_rate=0,
+    use_qkv_bias=True,
+    use_ln_bias=True,
+    use_layer_scale=True,
+    use_diffusion_head=True,
+    n_bits=NUM_BITS,
+    head_inner_dim=512,
+    head_n_layers=4,
+    head_n_heads=8,
+)
+
 ViT_debug = partial(
     ViT,
     channels=3,
