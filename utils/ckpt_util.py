@@ -61,13 +61,31 @@ def save_checkpoint(state, workdir, keep=2):
   return checkpoints.save_checkpoint_multiprocess(gs_workdir, state, int(state.step), keep=keep)
 
 
+def _recursive_copy(target, source):
+  """Recursively copy values from source into target, preserving target structure.
+
+  Only copies values for keys that exist in target. This handles structure
+  mismatches between checkpoints (e.g. missing bias in final_ln, extra _model
+  nesting in embedding) without changing the Phase 2 param tree shape.
+  """
+  import jax.numpy as jnp
+  for k in list(target.keys()):
+    if k not in source:
+      continue
+    if isinstance(target[k], dict) and isinstance(source[k], dict):
+      _recursive_copy(target[k], source[k])
+    elif isinstance(target[k], dict) and hasattr(source[k], 'keys'):
+      _recursive_copy(target[k], source[k])
+    else:
+      target[k] = jnp.array(source[k])
+
+
 def load_backbone_params(state, load_backbone_from, workdir):
   """Load backbone params from a Phase 1 checkpoint into a Phase 2 state.
 
   Copies all params except 'fc' and 'diffusion_head' from the checkpoint,
   leaving the Phase 2 head randomly initialized. Resets step/opt_state.
   """
-  import jax.numpy as jnp
   zone = infer_zone_from_workdir(workdir)
   gs_path = convert_to_gs(load_backbone_from, zone)
   raw_ckpt = checkpoints.restore_checkpoint(gs_path, target=None)
@@ -75,10 +93,9 @@ def load_backbone_params(state, load_backbone_from, workdir):
                      if k not in ('fc', 'diffusion_head')}
   # Start from the current (Phase 2) params tree (unfreeze to plain dicts).
   current = unfreeze(state.params)
-  # Copy backbone values, converting numpy arrays to JAX arrays to ensure
-  # consistent pytree node types throughout.
-  for key, val in backbone_params.items():
-    current[key] = jax.tree_util.tree_map(jnp.array, val)
+  # Recursively copy checkpoint values, preserving the Phase 2 tree structure.
+  # This tolerates minor structure differences (missing bias, extra nesting, etc.)
+  _recursive_copy(current, backbone_params)
   new_params = freeze(current)
   # Reinit optimizer state. optax.masked expects plain dicts (not FrozenDict),
   # so unfreeze before init then re-store frozen params.
