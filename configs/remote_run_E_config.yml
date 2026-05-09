@@ -47,5 +47,8 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
+    wandb_notes: 'phase2 Run E: zero-init out_proj in diffusion head; otherwise same as Run C (uniform schedule, biases+LS backbone). Tests whether zero-init helps early training stability.'
     wandb_tags:
         - sqa
+        - phase2
+        - zero-init

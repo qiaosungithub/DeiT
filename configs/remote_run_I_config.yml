@@ -50,5 +50,8 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
+    wandb_notes: 'phase2 Run I: warm-start diffusion head from Phase 1 Run 3 (73.14% CE backbone). Tests whether pretrained backbone accelerates convergence vs random-init (Run C).'
     wandb_tags:
         - sqa
+        - phase2
+        - warm-start

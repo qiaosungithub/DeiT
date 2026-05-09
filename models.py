@@ -254,15 +254,17 @@ class ViT(nn.Module):
         self.embedding = TorchLinear(self.channels * (patch_size ** 2), embed_dim)
         # self.pos_emb = sinous_embedding(num_patches + 1, embed_dim)
         self.pos_emb = self.param('pos_emb', nn.initializers.truncated_normal(0.02), (1, num_patches + 1, embed_dim))
-        self.cls = self.param('cls', nn.initializers.truncated_normal(0.02), (1, 1, embed_dim))
+        self.cls = self.param('cls', nn.initializers.normal(1e-6), (1, 1, embed_dim))
+        # Stochastic depth: linearly scale from 0 to stochastic_depth_rate (matches reference)
+        sd_scale = 1 if n_layers <= 1 else n_layers - 1
         self.layers = [Layer(heads, embed_dim, self.linear_dim, self.attn_dim,
                              dropout_rate=self.dropout_rate,
-                             stochastic_depth_rate=self.stochastic_depth_rate,
+                             stochastic_depth_rate=self.stochastic_depth_rate * i / sd_scale,
                              use_qkv_bias=self.use_qkv_bias,
                              use_ln_bias=self.use_ln_bias,
                              use_layer_scale=self.use_layer_scale)
-                       for _ in range(n_layers)]
-        self.final_ln = nn.LayerNorm(use_scale=True, use_bias=False,scale_init=nn.initializers.ones)
+                       for i in range(n_layers)]
+        self.final_ln = nn.LayerNorm(use_scale=True, use_bias=self.use_ln_bias, scale_init=nn.initializers.ones)
         if not self.use_diffusion_head:
             self.fc = special_linear(num_classes, use_bias=True)
         elif self.head_type == 'mlp':

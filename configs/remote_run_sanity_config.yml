@@ -1,0 +1,52 @@
+# Phase 1 Sanity Run: Full alignment with reference implementation
+# Changes from Phase 1 Run 3 (73.14%):
+# 1. Weight decay mask: no WD on cls/pos_emb/bias/scale (CRITICAL - was missing)
+# 2. b2=0.999 (reference standard, was 0.95)
+# 3. LR schedule: custom tang+warmup+cosine (matches reference exactly, was warmup_cosine_decay_schedule)
+# 4. CLS token init: normal(1e-6) (was truncated_normal(0.02))
+# 5. Stochastic depth: linear schedule 0→0.1 per layer (was uniform 0.1 everywhere)
+# 6. Final LayerNorm: use_bias=True (was False)
+# Architecture: ViT_base_v3 (biases=True, LearnedScale=True) — same best arch from Phase 1
+
+model: ViT_base_v3
+
+dataset:
+    num_workers: 16
+    prefetch_factor: 4
+
+    use_rand_augment: true
+    rand_augment: rand-m9-mstd0.5-inc1
+    reprob: 0.25
+
+    use_mixup_cutmix: true
+    mixup_prob: 1.0
+    switch_prob: 0.5
+    mixup_alpha: 0.8
+    cutmix_alpha: 1.0
+
+    repeated_aug: 3
+    label_smoothing: 0.1
+    num_tpus: 8
+
+batch_size: 1024
+learning_rate: 0.0005
+num_epochs: 330
+log_per_step: 100
+
+optimizer: adamw
+weight_decay: 0.05
+adamw_b2: 0.999
+dropout_rate: 0.0
+stochastic_depth_rate: 0.1
+grad_norm_clip: null
+
+logging:
+    use_wandb: True
+    wandb_project: 'deit'
+    wandb_entity: 'sqa24-massachusetts-institute-of-technology'
+    wandb_notes: 'sanity-run: full alignment with reference (WD mask, b2=0.999, LR schedule, cls init, stochastic depth schedule, final LN bias) — target 81.8%'
+    wandb_tags:
+        - sqa
+        - phase1-sanity
+        - wd-mask
+        - b2-0.999

@@ -46,5 +46,8 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
+    wandb_notes: 'phase2 Run G: larger diffusion head (512-dim, 4 layers, 8 heads) vs Run C (256-dim, 2 layers). Ablates head capacity: does more capacity help diffusion decoding?'
     wandb_tags:
         - sqa
+        - phase2
+        - large-head

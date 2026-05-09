@@ -49,5 +49,8 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
+    wandb_notes: 'phase2 Run H: attention head + aux CE loss (lambda=0.1). Tests whether CE supervision on backbone improves convergence speed vs pure diffusion loss (Run C baseline).'
     wandb_tags:
         - sqa
+        - phase2
+        - aux-ce

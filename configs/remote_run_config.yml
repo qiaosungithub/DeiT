@@ -47,5 +47,8 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
+    wandb_notes: 'phase2 Run F: MLP head baseline. Ablation: attention vs MLP diffusion head. Same setup as Run C but head_type=mlp. Tests if attention over bits is necessary.'
     wandb_tags:
         - sqa
+        - phase2
+        - mlp-head

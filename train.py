@@ -160,20 +160,29 @@ def create_learning_rate_fn(
   #     end_value=base_learning_rate,
   #     transition_steps=config.warmup_epochs * steps_per_epoch,
   # )
-  cosine_epochs = max((config.num_epochs-10) - config.warmup_epochs, 1)
-  # cosine_fn = optax.cosine_decay_schedule(
-  #     init_value=base_learning_rate, decay_steps=cosine_epochs * steps_per_epoch
-  # )
-  # schedule_fn = optax.join_schedules(
-  #     schedules=[warmup_fn, cosine_fn],
-  #     boundaries=[config.warmup_epochs * steps_per_epoch],
-  # )
-  # print('warmup_epochs:', config.warmup_epochs)
-  # print('cosine_epochs:', cosine_epochs)
-  # print('steps_per_epoch:', steps_per_epoch)
-  first_schedule = optax.schedules.warmup_cosine_decay_schedule(init_value=0.0, peak_value=base_learning_rate, warmup_steps=config.warmup_epochs*steps_per_epoch, decay_steps=(config.warmup_epochs + cosine_epochs)*steps_per_epoch, end_value=1e-5) 
-  second_schedule = optax.schedules.constant_schedule(value=1e-5)
-  return optax.join_schedules(schedules=[first_schedule, second_schedule], boundaries=[(config.warmup_epochs + cosine_epochs)*steps_per_epoch])
+  # Match the reference DeiT schedule exactly:
+  # epoch 0: const 1e-6; epochs 1..warmup: linear to peak; then cosine to 1e-5; last 10 epochs: const 1e-5
+  warmup_lr = 1e-6
+  warmup_epochs = config.warmup_epochs
+  cool_down_lr = 1e-5
+  cosine_epochs = max((config.num_epochs - 10) - warmup_epochs, 1)
+
+  def tang_schedule(step: int) -> float:
+    return warmup_lr
+
+  def warmup_schedule(step: int) -> float:
+    epoch = step // steps_per_epoch
+    return warmup_lr + (base_learning_rate - warmup_lr) * (epoch / warmup_epochs)
+
+  def cosine_schedule(step: int) -> float:
+    epoch = step // steps_per_epoch
+    epoch += warmup_epochs
+    return cool_down_lr + 0.5 * (base_learning_rate - cool_down_lr) * (1 + jnp.cos(jnp.pi * epoch / config.num_epochs))
+
+  return optax.join_schedules(
+    schedules=[tang_schedule, warmup_schedule, cosine_schedule],
+    boundaries=[steps_per_epoch, (warmup_epochs + 1) * steps_per_epoch]
+  )
 
 
 
@@ -402,6 +411,30 @@ def sync_batch_stats(state):
   return state.replace(batch_stats=cross_replica_mean(state.batch_stats))
 
 
+def get_no_weight_decay_dict(params):
+  """Build a boolean mask matching params: True = apply weight decay, False = skip.
+  No weight decay on bias, scale (LayerNorm), cls token, and pos_emb.
+  Matches reference DeiT implementation.
+  """
+  def modify_value_based_on_key(obj):
+    if not isinstance(obj, dict):
+      return obj
+    for k, v in obj.items():
+      if not isinstance(v, dict):
+        if k in {'cls', 'pos_emb', 'bias', 'scale'}:
+          obj[k] = False
+        else:
+          obj[k] = True
+    return obj
+  def is_leaf(obj):
+    if not isinstance(obj, dict):
+      return True
+    modify_value_based_on_key(obj)
+    return isinstance(obj, dict) and all(not isinstance(v, dict) for v in obj.values())
+  u = jax.tree_util.tree_map(lambda x: False, params)
+  return jax.tree_util.tree_map(functools.partial(modify_value_based_on_key), u, is_leaf=is_leaf)
+
+
 def create_train_state(
     rng, config: ml_collections.ConfigDict, model, image_size, learning_rate_fn
 ):
@@ -428,12 +461,14 @@ def create_train_state(
   elif config.optimizer == 'adamw':
     grad_norm_clip = config.grad_norm_clip
     assert grad_norm_clip is None, "grad_norm_clip is not supported in AdamW"
+    no_wd_mask = get_no_weight_decay_dict(params)
     tx = optax.adamw(
       learning_rate=learning_rate_fn,
       b1=0.9,
-      b2=config.get('adamw_b2', 0.95),
+      b2=config.get('adamw_b2', 0.999),
       eps=1e-8,
       weight_decay=config.weight_decay,
+      mask=no_wd_mask,
     )
   else:
     raise ValueError(f'Unknown optimizer: {config.optimizer}, choose from "sgd" or "adamw"')
