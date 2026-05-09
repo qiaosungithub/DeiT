@@ -30,7 +30,7 @@
   | 279   | **70.300%**  | ✅ continued growth (+0.57%) |
   | 299   | **71.470%**  | ✅ continued growth (+1.17%) |
   | 319   | **71.956%**  | ✅ continued growth (+0.49%) |
-- **Status**: ✅ Nearly done — ep=319.96/330 as of 2026-05-09 04:12; final eval at ep=329 upcoming
+- **Status**: ✅ **FINISHED** — ep=319 final eval (ep=329 not reached in schedule); axuxm0 now IDLE+free
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260507_182637_7910jh_kmh-tpuvm-v6e-8-spot-gzy-axuxm0_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -57,7 +57,7 @@
   | 199   | 63.614%      | partial recovery (+0.58%) but still below ep=159 peak |
   | 219   | **64.396%**  | ✅ recovery continuing (+0.78%) |
   | 239   | **65.360%**  | ✅ solid growth (+0.96%) |
-- **Status**: Running (ep=239.2 as of 2026-05-09 04:08)
+- **Status**: Running (ep=254 as of 2026-05-09 05:41; ep=259 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_023930_kq4hfm_kmh-tpuvm-v6e-8-spot-gzy-p1u4mx_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -84,7 +84,7 @@
   | 199   | 66.254%      | ⚠️ slight dip (-0.09%) — essentially flat; v1 gap widening |
   | 219   | **67.156%**  | ✅ recovery (+0.90%) |
   | 239   | **68.784%**  | ✅ big jump (+1.63%) |
-- **Status**: Running (ep=239.2 as of 2026-05-09 04:15; ep=259 eval upcoming)
+- **Status**: Running (ep=253 as of 2026-05-09 05:41; ep=259 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -96,22 +96,23 @@
 | 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.36%** | TBD | TBD | TBD |
 | 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | TBD | TBD | TBD | TBD |
 
-**Ranking at ep=239**: v1(TBD) >> v3(**68.78%**) > v2(65.36%) — Run 3 surging with big ep=239 jump
-- **Run 1 ep=319 = 71.96%**: still growing; final ep=330 eval imminent (finishes in ~30min)
-- **Run 3 ep=239 = 68.78%**: +1.63% jump; now closer to Run 1 pace
+**Ranking at ep=239/254**: v1 FINISHED(71.96%) >> v3(**68.78%**@239) > v2(65.36%@239) — Runs 2&3 at ep=254/253, ep=259 upcoming
+- **Run 1 ep=319 = 71.96%**: FINISHED (ep=329 not reached in schedule)
+- **Run 2 ep=254, Run 3 ep=253**: both approaching ep=259 eval
 
-## TODO / Next Steps (2026-05-09)
-- Run 1: ep=299 latest; ep=319 eval upcoming
-- Run 2: ep=219 latest; ep=239 eval upcoming
-- Run 3: ep=219 latest; ep=239 eval upcoming
-- **Phase 2 Run A** (ep=99): **12.21%** — strong acceleration continuing
-- **Phase 2 Run C** (ep=39): **2.12%/3.96% iter** — leading vs old code at same epoch
-- **Phase 2 Run D** (ep=39): **2.26%/4.07% iter** — slight edge over C; logit-normal schedule
-- **Phase 2 Run E**: READY TO LAUNCH — zero-init out_proj; need user to register i91hh1 alias
-  - TPU: kmh-tpuvm-v6e-8-spot-gzy-i91hh1 (asia-northeast1-b) [IDLE]
-  - Alias needed: v6e-8-tmp207
-  - Config: configs/remote_run_config_E.yml
-  - Launch: `ftmd kmh-tpuvm-v6e-8-spot-gzy-i91hh1 v6e-8-tmp207; tpu run kmh-tpuvm-v6e-8-spot-gzy-i91hh1 sqa dir=7 --config=configs/load_config.py:remote_run_E`
+## TODO / Next Steps (2026-05-09 05:41)
+- Run 2: ep=254, ep=259 eval upcoming (~20min)
+- Run 3: ep=253, ep=259 eval upcoming (~25min)
+- **Phase 2 Run A** (ep=135): ep=139 eval upcoming (~20min)
+- **Phase 2 Run C** (ep=81): **17.94%/23.92%** — leading; ep=99 eval upcoming (~2hr)
+- **Phase 2 Run D** (ep=80): **15.71%/21.53%** — behind C; ep=99 eval upcoming (~2hr)
+- **Phase 2 Run E**: READY TO LAUNCH — axuxm0 already IDLE+MOUNTED (Run 1 finished)
+  - User run: `tpu run kmh-tpuvm-v6e-8-spot-gzy-axuxm0 sqa dir=7 --config=configs/load_config.py:remote_run_E`
+  - Config: configs/remote_run_config_E.yml (zero-init out_proj, uniform schedule)
+- **Phase 2 Runs F/G/H**: user needs ftmd+tpu_run (safety classifier blocks autonomous):
+  - Run F (MLP): `ftmd kmh-tpuvm-v6e-8-spot-gzy-3djlis v6e-8-tmp208 && tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.py:remote_run`
+  - Run G (large): `ftmd kmh-tpuvm-v6e-8-spot-gzy-06q7u9 v6e-8-tmp209 && tpu run kmh-tpuvm-v6e-8-spot-gzy-06q7u9 sqa dir=7 --config=configs/load_config.py:remote_run_G`
+  - Run H (aux CE): `ftmd kmh-tpuvm-v6e-8-spot-gzy-qxxa8y v6e-8-tmp210 && tpu run kmh-tpuvm-v6e-8-spot-gzy-qxxa8y sqa dir=7 --config=configs/load_config.py:remote_run_H`
 
 ---
 
@@ -156,7 +157,7 @@
   | 79    | **5.784%**   | **0.609** | ✅ ACCELERATING — 2.5x from ep=59; steep growth curve |
   | 99    | **12.212%**  | **0.566** | ✅ ACCELERATING — 2.1x from ep=79; best so far |
   | 119   | **17.948%**  | **0.537** | ✅ ACCELERATING — 1.47x from ep=99; still climbing |
-- **Status**: ✅ Running (ep=120 as of 2026-05-09 04:05; ep=139 eval upcoming)
+- **Status**: ✅ Running (ep=135 as of 2026-05-09 05:41; ep=139 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_152809_369ujx_kmh-tpuvm-v6e-8-spot-gzy-c8umw4_us-east5-b__b_lr_ep_eval`
 ### Run B — ViT_base_mdh (b2=0.999)
 - **Window**: 6349
@@ -185,14 +186,15 @@
 - **Key fixes**: no mixup/cutmix in training, iterative eval (4-step), uniform mask schedule, b2=0.95
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_211542_1ekprl_kmh-tpuvm-v6e-8-spot-gzy-yq00yh_us-east5-b__b_lr_ep_eval`
 - **Early signal**: step=200 train_accuracy=**8.4%** (vs ~0.1% same point in Runs A/B) — NO-MIXUP FIX WORKING 🚀
-- **Status**: ✅ Running (ep=59.3 as of 2026-05-09 03:30; ep=79 eval upcoming)
+- **Status**: ✅ Running (ep=81 as of 2026-05-09 05:41; ep=99 eval upcoming)
 - **Eval checkpoints**:
   | epoch | eval_accuracy | eval_loss | eval_accuracy_iter | eval_invalid_rate | notes |
   |-------|--------------|-----------|-------------------|-------------------|-------|
   | 0     | 0.090%       | 0.681     | 0.186%            | 0.000%            | near random — expected at ep=0 |
   | 19    | **0.282%**   | 0.682     | **0.478%**        | 0.000%            | ✅ 3.1x single-step, 2.6x iter vs ep=0; outperforms Run A/B at ep=19 (0.186%, 0.134%) |
   | 39    | **2.122%**   | **0.640** | **3.958%**        | 2.242%            | ✅ 7.5x single, 8.3x iter vs ep=19; 4x ahead of Run A at same epoch! |
-  | 59    | **9.180%**   | **0.586** | **14.042%**       | 2.808%            | ✅ 4.3x single, 3.5x iter vs ep=39; ACCELERATION — approaching Run A ep=99 (12.2%) |
+  | 59    | **9.180%**   | **0.586** | **14.042%**       | 2.808%            | ✅ 4.3x single, 3.5x iter vs ep=39; ACCELERATION |
+  | 79    | **17.944%**  | **0.538** | **23.924%**       | 0.942%            | ✅ 1.95x single, 1.70x iter vs ep=59; matches Run A ep=119 (17.95%) in just 79ep!
 
 ### Run D — ViT_base_mdh (FIXED: no mixup, logit-normal mask schedule)
 - **Window**: 6364
@@ -203,7 +205,7 @@
 - **Architecture**: same as Run C
 - **Key fixes**: no mixup/cutmix, iterative eval (4-step), logit_normal mask schedule, b2=0.95
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_212230_hc12e8_kmh-tpuvm-v6e-8-spot-gzy-8507kk_us-east5-b__b_lr_ep_eval`
-- **Status**: ✅ Running (ep=59.9 as of 2026-05-09 03:38; ep=79 eval upcoming)
+- **Status**: ✅ Running (ep=80 as of 2026-05-09 05:41; ep=99 eval upcoming)
 - **Eval checkpoints**:
   | epoch | eval_accuracy | eval_loss | eval_accuracy_iter | eval_invalid_rate | notes |
   |-------|--------------|-----------|-------------------|-------------------|-------|
@@ -211,6 +213,7 @@
   | 19    | **0.326%**   | **0.680** | **0.532%**        | 5.120%            | ✅ 2.5x single, 2.8x iter vs ep=0; slightly AHEAD of C (0.282%/0.478%); high invalid rate from logit-normal OOD |
   | 39    | **2.258%**   | **0.638** | **4.074%**        | 1.632%            | ✅ 6.9x single, 7.7x iter vs ep=19; slightly ahead of C (2.12%/3.96%); invalid rate improved |
   | 59    | **8.456%**   | **0.591** | **12.456%**       | 2.702%            | ⚠️ now BEHIND C (9.18%/14.04%) — uniform schedule overtook logit-normal |
+  | 79    | **15.706%**  | **0.548** | **21.532%**       | 0.858%            | ⚠️ still behind C (17.94%/23.92%) — gap widening; uniform schedule consistently better |
 
 ### Run E — ViT_base_mdh_zero_init (zero-init out_proj, uniform schedule)
 - **Window**: TBD (not yet launched)

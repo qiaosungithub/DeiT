@@ -166,7 +166,7 @@ After each experiment completes:
   - **Alias convention**: asia-northeast1-b → tmp201+; us-east5-b → tmp51+. ALWAYS check zone before picking alias range.
   - `tpu register` (interactive, no args) only writes data.json — does NOT write to spreadsheet. Let user handle registration.
   - **All Run E/F/G/H aliases registered** in data.json. User needs to: `ftmd <full_tpu_name> <alias> && tpu run <full_tpu_name> sqa dir=7 --config=configs/load_config.py:<mode>`
-  - Run E: `ftmd kmh-tpuvm-v6e-8-spot-gzy-i91hh1 v6e-8-tmp207 && tpu run kmh-tpuvm-v6e-8-spot-gzy-i91hh1 sqa dir=7 --config=configs/load_config.py:remote_run_E`
+  - Run E: **i91hh1 preempted** — use axuxm0 (v6e-8-tmp202, already IDLE+MOUNTED): `tpu run kmh-tpuvm-v6e-8-spot-gzy-axuxm0 sqa dir=7 --config=configs/load_config.py:remote_run_E`
   - Run F: `ftmd kmh-tpuvm-v6e-8-spot-gzy-3djlis v6e-8-tmp208 && tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.py:remote_run`
   - Run G: `ftmd kmh-tpuvm-v6e-8-spot-gzy-06q7u9 v6e-8-tmp209 && tpu run kmh-tpuvm-v6e-8-spot-gzy-06q7u9 sqa dir=7 --config=configs/load_config.py:remote_run_G`
   - Run H: `ftmd kmh-tpuvm-v6e-8-spot-gzy-qxxa8y v6e-8-tmp210 && tpu run kmh-tpuvm-v6e-8-spot-gzy-qxxa8y sqa dir=7 --config=configs/load_config.py:remote_run_H`
@@ -177,16 +177,16 @@ After each experiment completes:
 - **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
 - **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
 
-## Phase 2 Progress Summary (as of 2026-05-09 ~04:50)
+## Phase 2 Progress Summary (as of 2026-05-09 05:45)
 
 | Run | Architecture | ep | single-step | iter | notes |
 |-----|-------------|-----|-------------|------|-------|
-| A | attention head, mixup BUG | 120 | ~20%? | N/A | ep=119=17.95%; ep=139 upcoming |
-| C | attention head, uniform | 72 | ~11%? | ~17%? | LEADING; ep=59=9.18%/14.04%; ep=79 upcoming |
-| D | attention head, logit-normal | 71 | ~10%? | ~15%? | ep=59=8.46%/12.46%; behind C |
-| E | attention head, zero-init | TBD | TBD | TBD | alias registered; user needs ftmd+tpu_run |
-| F | MLP head baseline | TBD | TBD | TBD | alias registered; need slot (6/8 used; Run1 finishing) |
-| G | large head (512-dim, 4L) | TBD | TBD | TBD | alias registered; need slot |
+| A | attention head, mixup BUG | 135 | ~20%+ | N/A | ep=119=17.95%; ep=139 upcoming |
+| C | attention head, uniform | 81 | 17.94% | 23.92% | LEADING; ep=79=17.94%/23.92%; ep=99 upcoming |
+| D | attention head, logit-normal | 80 | 15.71% | 21.53% | behind C at ep=79; ep=99 upcoming |
+| E | attention head, zero-init | TBD | TBD | TBD | axuxm0 IDLE+MOUNTED; user needs: tpu zhan axuxm0 + tpu run |
+| F | MLP head baseline | TBD | TBD | TBD | 3djlis IDLE+MOUNTED; user needs ftmd+tpu_run (5 slots free) |
+| G | large head (512-dim, 4L) | TBD | TBD | TBD | 06q7u9 IDLE+MOUNTED; user needs ftmd+tpu_run |
 | H | attention + aux CE (λ=0.1) | TBD | TBD | TBD | NEW — alias registered; need slot |
 
 **Phase 1 Run 1**: ep=326/330 — finishing in ~20min; axuxm0 slot will be free
