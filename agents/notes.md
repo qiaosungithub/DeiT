@@ -172,17 +172,16 @@ After each experiment completes:
 - **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
 - **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
 
-## Phase 2 Progress Summary (as of 2026-05-09 ~03:38)
+## Phase 2 Progress Summary (as of 2026-05-09 ~04:10)
 
 | Run | Architecture | ep | single-step | iter | notes |
 |-----|-------------|-----|-------------|------|-------|
-| A | attention head, mixup BUG | 113 | ~15%? | N/A | old code; ep=99=12.21%, ep=119 upcoming |
-| C | attention head, uniform | 60 | **9.18%** | **14.04%** | LEADING; 4.3x jump ep39→59; uniform > logit-normal |
-| D | attention head, logit-normal | 60 | 8.46% | 12.46% | slightly behind C at ep=59; logit-normal inferior |
-| E | attention head, zero-init | TBD | TBD | TBD | alias registered; user needs to ftmd+tpu_run |
-| F | MLP head baseline | TBD | TBD | TBD | config ready; launch when slot opens (limit=8, 7 running) |
-| G | large head (512-dim, 4L) | TBD | TBD | TBD | config ready; launch when slot opens |
+| A | attention head, mixup BUG | 120 | ~20%? | N/A | old code; ep=119=17.95%, ep=139 upcoming |
+| C | attention head, uniform | 66 | ~11%? | ~17%? | LEADING; ep=59=9.18%/14.04%; ep=79 upcoming |
+| D | attention head, logit-normal | 65 | ~10%? | ~15%? | ep=59=8.46%/12.46%; behind C |
+| E | attention head, zero-init | TBD | TBD | TBD | i91hh1 MOUNTED+IDLE; user needs ftmd+tpu_run |
+| F | MLP head baseline | TBD | TBD | TBD | config ready; need slot (7/8 used) |
+| G | large head (512-dim, 4L) | TBD | TBD | TBD | config ready; need slot |
 
-**Key finding ep=59**: uniform mask schedule (C) now ahead of logit-normal (D) by ~8% relative.
-- Trajectory C: 0.28% → 2.12% → **9.18%** (roughly 4x per 20 epochs so far, decelerating)
-- Projection: ep=79 may reach ~25-35%; ep=99 may reach ~50%+ (Run A was 12.21% at ep=99 with OLD code)
+**Key trajectory (Run A, old-code baseline)**: ep79=5.78% → ep99=12.21% → ep119=17.95% → still accelerating
+**Key trajectory (Run C, fixed-code)**: ep39=2.12% → ep59=9.18% — much faster, next check ep=79

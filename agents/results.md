@@ -55,7 +55,8 @@
   | 179   | 63.032%      | ⚠️ DIP — dropped from ep=159 (no LS instability?) |
   | 199   | 63.614%      | partial recovery (+0.58%) but still below ep=159 peak |
   | 219   | **64.396%**  | ✅ recovery continuing (+0.78%) |
-- **Status**: Running (ep~220 as of 2026-05-09 02:46)
+  | 239   | **65.360%**  | ✅ solid growth (+0.96%) |
+- **Status**: Running (ep=239.2 as of 2026-05-09 04:08)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_023930_kq4hfm_kmh-tpuvm-v6e-8-spot-gzy-p1u4mx_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -90,8 +91,8 @@
 | Run | qkv_bias | ln_bias | LearnedScale | ep19  | ep39   | ep59  | ep79  | ep99  | ep119 | ep139 | ep159 | ep179 | ep199 | ep219 | ep259 | ep279 | ep299 | ep330 |
 |-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | TBD | 69.73% | **70.30%** | **71.47%** | TBD |
-| 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | **64.40%** | TBD | TBD | TBD | TBD |
-| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | **67.16%** | TBD | TBD | TBD | TBD |
+| 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.36%** | TBD | TBD | TBD |
+| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | TBD | TBD | TBD | TBD |
 
 **Ranking at ep=219**: v1(TBD) >> v3(67.16%) > v2(64.40%) — v1 likely further ahead
 - **Run 1 ep=299 = 71.47%**: strong growth, on track for 81%+.
@@ -153,7 +154,8 @@
   | 59    | **2.318%**   | **0.636** | ✅ BIG JUMP — 4.4x from ep=39; accelerating learning |
   | 79    | **5.784%**   | **0.609** | ✅ ACCELERATING — 2.5x from ep=59; steep growth curve |
   | 99    | **12.212%**  | **0.566** | ✅ ACCELERATING — 2.1x from ep=79; best so far |
-- **Status**: ✅ Running (ep~107 as of 2026-05-09 02:46; ep=119 eval upcoming)
+  | 119   | **17.948%**  | **0.537** | ✅ ACCELERATING — 1.47x from ep=99; still climbing |
+- **Status**: ✅ Running (ep=120 as of 2026-05-09 04:05; ep=139 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_152809_369ujx_kmh-tpuvm-v6e-8-spot-gzy-c8umw4_us-east5-b__b_lr_ep_eval`
 ### Run B — ViT_base_mdh (b2=0.999)
 - **Window**: 6349
