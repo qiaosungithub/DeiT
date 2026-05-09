@@ -163,7 +163,8 @@
   | 119   | **17.948%**  | **0.537** | ✅ ACCELERATING — 1.47x from ep=99; still climbing |
   | 139   | **24.440%**  | **0.502** | ✅ ACCELERATING — 1.36x from ep=119; +6.49% jump |
   | 159   | **30.556%**  | **0.467** | ✅ 1.25x from ep=139; +6.1% — growth decelerating |
-- **Status**: ✅ Running (ep=160 as of 2026-05-09 08:20; ep=179 eval upcoming)
+  | 179   | **37.246%**  | **0.433** | ✅ 1.22x from ep=159; +6.69% — deceleration slowing; Run C ep=119 (33.28%) trails by ~60ep |
+- **Status**: ✅ Running (ep=180 as of 2026-05-09 10:27; ep=199 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_152809_369ujx_kmh-tpuvm-v6e-8-spot-gzy-c8umw4_us-east5-b__b_lr_ep_eval`
 ### Run B — ViT_base_mdh (b2=0.999)
 - **Window**: 6349
