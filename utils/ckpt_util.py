@@ -1,6 +1,7 @@
 import os
 
 from flax.training import checkpoints
+from flax.core import freeze, unfreeze
 
 
 def infer_zone_from_workdir(workdir):
@@ -57,3 +58,19 @@ def save_checkpoint(state, workdir, keep=2):
   zone = infer_zone_from_workdir(workdir)
   gs_workdir = convert_to_gs(workdir, zone)
   return checkpoints.save_checkpoint_multiprocess(gs_workdir, state, int(state.step), keep=keep)
+
+
+def load_backbone_params(state, load_backbone_from, workdir):
+  """Load backbone params from a Phase 1 checkpoint into a Phase 2 state.
+
+  Copies all params except 'fc' and 'diffusion_head' from the checkpoint,
+  leaving the Phase 2 head randomly initialized. Resets step/opt_state.
+  """
+  zone = infer_zone_from_workdir(workdir)
+  gs_path = convert_to_gs(load_backbone_from, zone)
+  raw_ckpt = checkpoints.restore_checkpoint(gs_path, target=None)
+  backbone_params = {k: v for k, v in raw_ckpt['params'].items()
+                     if k not in ('fc', 'diffusion_head')}
+  merged = unfreeze(state.params)
+  merged.update(backbone_params)
+  return state.replace(params=freeze(merged))

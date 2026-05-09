@@ -51,6 +51,7 @@ def get_config():
 
   config.seed = 0  # init random seed
   config.load_from = ''
+  config.load_backbone_from = ''  # load backbone-only weights from a Phase 1 checkpoint
 
   # added by sqa
   config.grad_norm_clip = None

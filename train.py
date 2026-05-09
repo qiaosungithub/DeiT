@@ -517,7 +517,9 @@ def train_and_evaluate(
 
   if config.load_from != "":
     state = ckpt_util.restore_checkpoint(state, config.load_from, workdir)
-  
+
+  if config.get('load_backbone_from', '') != "":
+    state = ckpt_util.load_backbone_params(state, config.load_backbone_from, workdir)
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
   epoch_offset = step_offset // steps_per_epoch  # sanity check for resuming

@@ -177,17 +177,24 @@ After each experiment completes:
 - **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
 - **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
 
-## Phase 2 Progress Summary (as of 2026-05-09 05:45)
+## Phase 2 Progress Summary (as of 2026-05-09 07:00)
 
 | Run | Architecture | ep | single-step | iter | notes |
 |-----|-------------|-----|-------------|------|-------|
-| A | attention head, mixup BUG | 135 | ~20%+ | N/A | ep=119=17.95%; ep=139 upcoming |
-| C | attention head, uniform | 81 | 17.94% | 23.92% | LEADING; ep=79=17.94%/23.92%; ep=99 upcoming |
-| D | attention head, logit-normal | 80 | 15.71% | 21.53% | behind C at ep=79; ep=99 upcoming |
-| E | attention head, zero-init | TBD | TBD | TBD | axuxm0 IDLE+MOUNTED; user needs: tpu zhan axuxm0 + tpu run |
-| F | MLP head baseline | TBD | TBD | TBD | 3djlis IDLE+MOUNTED; user needs ftmd+tpu_run (5 slots free) |
+| A | attention head, mixup BUG | 146 | 24.44% | N/A | ep=139=24.44%; ep=159 upcoming |
+| C | attention head, uniform | 93 | 17.94% | 23.92% | LEADING; ep=99 upcoming ~35min |
+| D | attention head, logit-normal | 92 | 15.71% | 21.53% | behind C; ep=99 upcoming ~43min |
+| E | attention head, zero-init | TBD | TBD | TBD | axuxm0 IDLE+MOUNTED; user needs tpu_run |
+| F | MLP head baseline | TBD | TBD | TBD | 3djlis IDLE+MOUNTED; user needs ftmd+tpu_run |
 | G | large head (512-dim, 4L) | TBD | TBD | TBD | 06q7u9 IDLE+MOUNTED; user needs ftmd+tpu_run |
-| H | attention + aux CE (λ=0.1) | TBD | TBD | TBD | NEW — alias registered; need slot |
+| H | attention + aux CE (λ=0.1) | TBD | TBD | TBD | qxxa8y IDLE+MOUNTED; need slot (launch after one of E/F/G starts) |
+| I | pretrained backbone + diff head | TBD | TBD | TBD | NEW — wait for P1 Run 3 to finish (~6h); config: remote_run_I_config.yml |
 
-**Phase 1 Run 1**: ep=326/330 — finishing in ~20min; axuxm0 slot will be free
-**Run H (new)**: implemented auxiliary CE loss alongside diffusion loss — hypothesis: stronger backbone gradient early in training
+**Phase 1 Run 3 (j3rqvs)**: ep=260, ~70.62% at ep=259 — LEADING P1. When it finishes (~6-8h), Run I can start.
+**Run I (new)**: backbone-loading feature implemented (load_backbone_from config). Loads Phase 1 Run 3 weights into ViT_base_mdh backbone, fresh diffusion head. Should accelerate Phase 2 convergence dramatically.
+
+## New Feature: load_backbone_from (2026-05-09)
+- Config field `load_backbone_from` in default.py
+- In train.py: after state creation, if `load_backbone_from != ''`, calls `ckpt_util.load_backbone_params()`
+- `ckpt_util.load_backbone_params()`: loads raw checkpoint, copies all params except `fc`/`diffusion_head` into Phase 2 state, fresh optimizer state (step=0)
+- Run I config: `configs/remote_run_I_config.yml` — uses Phase 1 Run 3 logdir as `load_backbone_from`

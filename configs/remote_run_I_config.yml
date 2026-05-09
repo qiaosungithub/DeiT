@@ -1,0 +1,54 @@
+# Phase 2 Run I: attention head, warm-started from Phase 1 Run 3 backbone
+# Hypothesis: pretrained backbone (biases+LS, ~72% CE accuracy) gives faster convergence
+# and potentially higher final accuracy for the diffusion head.
+# NOTE: launch after Phase 1 Run 3 finishes (j3rqvs, ~ep=330 in ~6-8h from 2026-05-09 07:00)
+
+model: ViT_base_mdh
+
+load_backbone_from: /kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval
+
+dataset:
+    num_workers: 16
+    prefetch_factor: 4
+
+    use_rand_augment: true
+    rand_augment: rand-m9-mstd0.5-inc1
+    reprob: 0.25
+
+    use_mixup_cutmix: false
+    mixup_prob: 1.0
+    switch_prob: 0.5
+    mixup_alpha: 0.8
+    cutmix_alpha: 1.0
+
+    repeated_aug: 3
+    label_smoothing: 0.1
+    num_tpus: 8
+
+batch_size: 1024
+learning_rate: 0.0005
+num_epochs: 330
+log_per_step: 100
+
+optimizer: adamw
+weight_decay: 0.05
+adamw_b2: 0.95
+dropout_rate: 0.0
+stochastic_depth_rate: 0.1
+grad_norm_clip: null
+
+use_diffusion_head: true
+head_type: attention
+head_inner_dim: 256
+head_n_layers: 2
+head_n_heads: 4
+head_aux_ce: false
+mask_schedule: uniform
+eval_iter_steps: 4
+
+logging:
+    use_wandb: True
+    wandb_project: 'deit'
+    wandb_entity: 'sqa24-massachusetts-institute-of-technology'
+    wandb_tags:
+        - sqa
