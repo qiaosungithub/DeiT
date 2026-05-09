@@ -1,5 +1,6 @@
 import os
 
+import jax
 from flax.training import checkpoints
 from flax.core import freeze, unfreeze
 
@@ -66,11 +67,19 @@ def load_backbone_params(state, load_backbone_from, workdir):
   Copies all params except 'fc' and 'diffusion_head' from the checkpoint,
   leaving the Phase 2 head randomly initialized. Resets step/opt_state.
   """
+  import jax.numpy as jnp
   zone = infer_zone_from_workdir(workdir)
   gs_path = convert_to_gs(load_backbone_from, zone)
   raw_ckpt = checkpoints.restore_checkpoint(gs_path, target=None)
   backbone_params = {k: v for k, v in raw_ckpt['params'].items()
                      if k not in ('fc', 'diffusion_head')}
-  merged = unfreeze(state.params)
-  merged.update(backbone_params)
-  return state.replace(params=freeze(merged))
+  # Start from the current (Phase 2) params tree (unfreeze to plain dicts).
+  current = unfreeze(state.params)
+  # Copy backbone values, converting numpy arrays to JAX arrays to ensure
+  # consistent pytree node types throughout.
+  for key, val in backbone_params.items():
+    current[key] = jax.tree_util.tree_map(jnp.array, val)
+  new_params = freeze(current)
+  # Reinit optimizer state so it matches new_params structure exactly.
+  new_opt_state = state.tx.init(new_params)
+  return state.replace(params=new_params, opt_state=new_opt_state, step=0)
