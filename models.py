@@ -310,8 +310,10 @@ class ViT(nn.Module):
             if masked_bits is None:
                 masked_bits = jnp.full((x.shape[0], self.n_bits), 2)
             diff_logits = self.diffusion_head(cls, masked_bits)
-            if return_aux_ce and self.head_aux_ce:
-                return diff_logits, self.fc(cls)
+            if self.head_aux_ce:
+                ce_logits = self.fc(cls)  # always call so params are initialized
+                if return_aux_ce:
+                    return diff_logits, ce_logits
             return diff_logits
 
 ViT_base = partial(
