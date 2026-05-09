@@ -533,7 +533,7 @@ def train_and_evaluate(
   ) if not use_diffusion_head else jax.pmap(
     functools.partial(train_step_diffusion, rng_init=rng, learning_rate_fn=learning_rate_fn,
                       mask_schedule=config.get('mask_schedule', 'uniform'),
-                      aux_ce_loss_weight=config.get('aux_ce_loss_weight', 0.0)),
+                      aux_ce_loss_weight=config.get('aux_ce_loss_weight', 0.0) if config.get('head_aux_ce', False) else 0.0),
     axis_name='batch',
     donate_argnums=(0, 1),
   )
