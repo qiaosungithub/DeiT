@@ -91,7 +91,8 @@
   | 259   | **70.620%**  | ✅ BIG JUMP (+1.836%) — now AHEAD of Run 1 at ep=259 (69.726%)! biases+LS winning |
   | 279   | **71.404%**  | ✅ continued growth (+0.784%) — near Run 1's final 71.956% (ep=319); ~20ep ahead! |
   | 299   | **72.770%**  | ✅ BIG JUMP (+1.366%) — NOW SURPASSES Run 1 final (71.956%@ep=319)! biases+LS = clear winner |
-- **Status**: ✅ Running (ep=300 as of 2026-05-09 10:36; ep=319 eval upcoming)
+  | 319   | **73.140%**  | ✅ continued growth (+0.370%) — LEADS Run 1 final by 1.184pp; ep=329 final upcoming |
+- **Status**: ✅ Running (ep=320 as of 2026-05-09 12:43; final ep=329 eval ~60 min away)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -101,25 +102,25 @@
 |-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | TBD | 69.73% | **70.30%** | **71.47%** | TBD |
 | 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.68%** | **65.82%** | **65.66%**⚠️ | **65.96%** |
-| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | **70.62%** | **71.40%** | **72.77%** | TBD |
+| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | **70.62%** | **71.40%** | **72.77%** | **73.14%** |
 
-**Ranking at ep=299**: v3(**72.77%**) >> v1(71.47%@ep=299 FINISHED) >> v2(65.66%⚠️ plateaued)
-- **Run 1 ep=319 = 71.96%**: FINISHED — SURPASSED by Run 3 at ep=299!
-- **Run 3 ep=299 = 72.77%**: LEADS Run 1 final by 0.81%; ep=319 eval upcoming — may reach ~73.5%+
+**Ranking at ep=319**: v3(**73.14%**) >> v1(71.96%@ep=319) >> v2(65.96% plateaued) — v3 leads v1 by +1.18pp!
+- **Run 1 ep=319 = 71.96%**: FINISHED — SURPASSED by Run 3 at ep=299 (72.77%)!
+- **Run 3 ep=319 = 73.14%**: FINAL likely ~73.3-73.5% (ep=329 eval in ~60 min); biases+LS = clear winner
 
 ## TODO / Next Steps (2026-05-09 10:37)
-- **Phase 1 Run 2** (ep=300): plateaued at 65.66% — ep=319 upcoming, no change expected
-- **Phase 1 Run 3** (ep=300): **72.77%** — ep=319 upcoming; finishes ~13:47; Run I can start then
-- **Phase 2 Run A** (ep=180): **37.25%** — ep=199 eval in ~2h
-- **Phase 2 Run C** (ep=120): **33.28%/39.14%** — ep=139 upcoming ~1h; holding 40ep advantage over A
-- **Phase 2 Run D** (ep=120): **28.72%/34.98%** — ep=139 upcoming ~1.3h; trailing C by 4.6pp
+- **Phase 1 Run 2** (ep=320): **65.96%** plateaued — final ep=329 upcoming; no change expected
+- **Phase 1 Run 3** (ep=320): **73.14%@ep=319** — final ep=329 eval in ~60 min; finishes ~13:46; Run I can start on j3rqvs then
+- **Phase 2 Run A/C/D**: PREEMPTED ~11:07 us-east5-b wave; auto-resuming; last A=ep186 C=ep134 D=ep132
+- **Phase 2 Run C** last: **33.28%/39.14%** @ep=119; ep=139 eval pending resume
+- **Phase 2 Run D** last: **28.72%/34.98%** @ep=119; ep=139 eval pending resume
 
-### Queued Launches (user action required — 3 slots free, limit=8)
+### Queued Launches (user action required — 3 slots free; Run A/C/D resuming = 8 total if all launch)
 - **Run E** (zero-init, axuxm0 IDLE+MOUNTED): `tpu run kmh-tpuvm-v6e-8-spot-gzy-axuxm0 sqa dir=7 --config=configs/load_config.py:remote_run_E`
 - **Run F** (MLP, 3djlis IDLE+MOUNTED): `ftmd kmh-tpuvm-v6e-8-spot-gzy-3djlis v6e-8-tmp208 && tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.py:remote_run`
 - **Run G** (large head, 06q7u9 IDLE+MOUNTED): `ftmd kmh-tpuvm-v6e-8-spot-gzy-06q7u9 v6e-8-tmp209 && tpu run kmh-tpuvm-v6e-8-spot-gzy-06q7u9 sqa dir=7 --config=configs/load_config.py:remote_run_G`
-- **Run H** (aux CE, qxxa8y IDLE+MOUNTED, wait for P1 Run 2/3 to free slots): `ftmd kmh-tpuvm-v6e-8-spot-gzy-qxxa8y v6e-8-tmp210 && tpu run kmh-tpuvm-v6e-8-spot-gzy-qxxa8y sqa dir=7 --config=configs/load_config.py:remote_run_H`
-- **Run I** (pretrained backbone, launch after Phase 1 Run 3 finishes ~13:47): use p1u4mx or j3rqvs (freed after their runs finish); config: `configs/remote_run_I_config.yml`
+- **Run H** (aux CE, qxxa8y IDLE+MOUNTED): `ftmd kmh-tpuvm-v6e-8-spot-gzy-qxxa8y v6e-8-tmp210 && tpu run kmh-tpuvm-v6e-8-spot-gzy-qxxa8y sqa dir=7 --config=configs/load_config.py:remote_run_H`
+- **Run I** (pretrained backbone, launch after Phase 1 Run 3 finishes ~13:46): `tpu run kmh-tpuvm-v6e-8-spot-gzy-j3rqvs sqa dir=7 --config=configs/load_config.py:remote_run_I`
 
 ---
 
