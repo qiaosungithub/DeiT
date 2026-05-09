@@ -166,7 +166,7 @@
   | 139   | **24.440%**  | **0.502** | ✅ ACCELERATING — 1.36x from ep=119; +6.49% jump |
   | 159   | **30.556%**  | **0.467** | ✅ 1.25x from ep=139; +6.1% — growth decelerating |
   | 179   | **37.246%**  | **0.433** | ✅ 1.22x from ep=159; +6.69% — deceleration slowing; Run C ep=119 (33.28%) trails by ~60ep |
-- **Status**: ✅ Running (ep=180 as of 2026-05-09 10:27; ep=199 eval upcoming)
+- **Status**: ⚠️ PREEMPTED at ep=186 (~11:07 2026-05-09); auto-resuming (c8umw4 us-east5-b spot preemption wave)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_152809_369ujx_kmh-tpuvm-v6e-8-spot-gzy-c8umw4_us-east5-b__b_lr_ep_eval`
 ### Run B — ViT_base_mdh (b2=0.999)
 - **Window**: 6349
@@ -206,7 +206,7 @@
   | 79    | **17.944%**  | **0.538** | **23.924%**       | 0.942%            | ✅ 1.95x single, 1.70x iter vs ep=59; matches Run A ep=119 (17.95%) in just 79ep!
   | 99    | **26.146%**  | **0.494** | **32.562%**       | 2.006%            | ✅ 1.46x single, 1.36x iter vs ep=79; EXCEEDS Run A ep=139 (24.44%) — ~40ep advantage |
   | 119   | **33.276%**  | **0.461** | **39.138%**       | 1.430%            | ✅ 1.27x single, 1.20x iter vs ep=99; EXCEEDS Run A ep=159 (30.56%) — 40ep advantage holds |
-- **Status**: ✅ Running (ep=120 as of 2026-05-09 09:37; ep=139 eval upcoming)
+- **Status**: ⚠️ PREEMPTED at ep=134.8 (~11:07 2026-05-09); auto-resuming (yq00yh us-east5-b spot preemption wave)
 
 ### Run D — ViT_base_mdh (FIXED: no mixup, logit-normal mask schedule)
 - **Window**: 6364
@@ -228,7 +228,7 @@
   | 79    | **15.706%**  | **0.548** | **21.532%**       | 0.858%            | ⚠️ still behind C (17.94%/23.92%) — gap widening; uniform schedule consistently better |
   | 99    | **22.842%**  | **0.512** | **29.124%**       | 2.104%            | ⚠️ behind C (26.15%/32.56%) by 3.3%/3.4% — gap growing vs ep=79 (2.2%/2.4%) |
   | 119   | **28.722%**  | **0.482** | **34.980%**       | 2.654%            | ⚠️ behind C (33.28%/39.14%) by 4.6%/4.2% — gap continues to widen; uniform definitively better |
-- **Status**: ✅ Running (ep=120 as of 2026-05-09 09:50; ep=139 eval upcoming)
+- **Status**: ⚠️ PREEMPTED at ep=132.5 (~11:08 2026-05-09); auto-resuming (8507kk us-east5-b spot preemption wave)
 
 ### Run E — ViT_base_mdh_zero_init (zero-init out_proj, uniform schedule)
 - **Window**: TBD (not yet launched)
