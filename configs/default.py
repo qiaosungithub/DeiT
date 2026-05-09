@@ -70,6 +70,7 @@ def get_config():
   config.mask_schedule = 'uniform'   # 'uniform' or 'logit_normal'
   config.eval_iter_steps = 4         # iterative decode steps in eval
   config.head_type = 'attention'     # 'attention' | 'mlp'
+  config.head_zero_init_proj = False  # zero-init final projection layer of diffusion head
 
   config.logging = logging = ml_collections.ConfigDict()
   logging.wandb_project = ''
