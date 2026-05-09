@@ -1,6 +1,7 @@
 import os
 
 import jax
+import jax.numpy as jnp
 from flax.training import checkpoints
 from flax.core import freeze, unfreeze
 
@@ -68,7 +69,6 @@ def _recursive_copy(target, source):
   mismatches between checkpoints (e.g. missing bias in final_ln, extra _model
   nesting in embedding) without changing the Phase 2 param tree shape.
   """
-  import jax.numpy as jnp
   for k in list(target.keys()):
     if k not in source:
       continue
@@ -97,7 +97,9 @@ def load_backbone_params(state, load_backbone_from, workdir):
   # This tolerates minor structure differences (missing bias, extra nesting, etc.)
   _recursive_copy(current, backbone_params)
   new_params = freeze(current)
-  # Reinit optimizer state. optax.masked expects plain dicts (not FrozenDict),
-  # so unfreeze before init then re-store frozen params.
-  new_opt_state = state.tx.init(unfreeze(new_params))
+  # Reset optimizer state to zeros, preserving the existing frozen params tree structure.
+  # We cannot call tx.init(new_params) because the WD mask (built from plain dicts in
+  # create_train_state) is incompatible with FrozenDict params. Instead, zero the
+  # existing opt_state (which has the correct frozen structure) and set step=0.
+  new_opt_state = jax.tree_util.tree_map(jnp.zeros_like, state.opt_state)
   return state.replace(params=new_params, opt_state=new_opt_state, step=0)
