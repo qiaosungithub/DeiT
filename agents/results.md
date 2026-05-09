@@ -89,7 +89,8 @@
   | 239   | **68.784%**  | ✅ big jump (+1.63%) |
   | 259   | **70.620%**  | ✅ BIG JUMP (+1.836%) — now AHEAD of Run 1 at ep=259 (69.726%)! biases+LS winning |
   | 279   | **71.404%**  | ✅ continued growth (+0.784%) — near Run 1's final 71.956% (ep=319); ~20ep ahead! |
-- **Status**: Running (ep=280 as of 2026-05-09 08:29; ep=299 eval upcoming)
+  | 299   | **72.770%**  | ✅ BIG JUMP (+1.366%) — NOW SURPASSES Run 1 final (71.956%@ep=319)! biases+LS = clear winner |
+- **Status**: ✅ Running (ep=300 as of 2026-05-09 10:36; ep=319 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -99,11 +100,11 @@
 |-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | TBD | 69.73% | **70.30%** | **71.47%** | TBD |
 | 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.68%** | **65.82%** | **65.66%**⚠️ | TBD |
-| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | **70.62%** | **71.40%** | TBD | TBD |
+| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | **70.62%** | **71.40%** | **72.77%** | TBD |
 
-**Ranking at ep=279**: v3(**71.40%**) >> v2(65.82%) — Run 3 within 0.56% of Run 1 final (71.96%@ep=319)!
-- **Run 1 ep=319 = 71.96%**: FINISHED
-- **Run 3 ep=279 = 71.40%**: only 0.56% behind Run 1's final; on track to surpass it by ep=310-320
+**Ranking at ep=299**: v3(**72.77%**) >> v1(71.47%@ep=299 FINISHED) >> v2(65.66%⚠️ plateaued)
+- **Run 1 ep=319 = 71.96%**: FINISHED — SURPASSED by Run 3 at ep=299!
+- **Run 3 ep=299 = 72.77%**: LEADS Run 1 final by 0.81%; ep=319 eval upcoming — may reach ~73.5%+
 
 ## TODO / Next Steps (2026-05-09 09:37)
 - Run 2: ep=288; ep=299 eval in ~76 min
