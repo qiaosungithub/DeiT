@@ -162,9 +162,13 @@ After each experiment completes:
 - **Registered v6e-8 aliases**:
   - asia-northeast1-b: v6e-8-tmp201→j3rqvs, v6e-8-tmp202→axuxm0, v6e-8-tmp203→p1u4mx
   - us-east5-b: v6e-8-tmp51→c8umw4 (Phase 2 Run A), v6e-8-tmp52→cz2ivo (Phase 2 Run B), v6e-8-tmp53→8507kk (Run D), v6e-8-tmp205/206→yq00yh (Run C)
+  - asia-northeast1-b (new): v6e-8-tmp207→i91hh1 (Run E), v6e-8-tmp208→3djlis (Run F), v6e-8-tmp209→06q7u9 (Run G)
   - **Alias convention**: asia-northeast1-b → tmp201+; us-east5-b → tmp51+. ALWAYS check zone before picking alias range.
   - `tpu register` (interactive, no args) only writes data.json — does NOT write to spreadsheet. Let user handle registration.
-  - **Next available alias**: v6e-8-tmp207 for i91hh1 (asia-northeast1-b, Run E)
+  - **All Run E/F/G aliases registered** in data.json. User needs to: `ftmd <full_tpu_name> <alias> && tpu run <full_tpu_name> sqa dir=7 --config=configs/load_config.py:<mode>`
+  - Run E: `ftmd kmh-tpuvm-v6e-8-spot-gzy-i91hh1 v6e-8-tmp207 && tpu run kmh-tpuvm-v6e-8-spot-gzy-i91hh1 sqa dir=7 --config=configs/load_config.py:remote_run_E`
+  - Run F: `ftmd kmh-tpuvm-v6e-8-spot-gzy-3djlis v6e-8-tmp208 && tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.py:remote_run`
+  - Run G: `ftmd kmh-tpuvm-v6e-8-spot-gzy-06q7u9 v6e-8-tmp209 && tpu run kmh-tpuvm-v6e-8-spot-gzy-06q7u9 sqa dir=7 --config=configs/load_config.py:remote_run_G`
 
 ## Critical Bugs Found and Fixed (2026-05-09)
 
