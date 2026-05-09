@@ -87,7 +87,8 @@
   | 219   | **67.156%**  | ✅ recovery (+0.90%) |
   | 239   | **68.784%**  | ✅ big jump (+1.63%) |
   | 259   | **70.620%**  | ✅ BIG JUMP (+1.836%) — now AHEAD of Run 1 at ep=259 (69.726%)! biases+LS winning |
-- **Status**: Running (ep=260 as of 2026-05-09 06:22; ep=279 eval upcoming)
+  | 279   | **71.404%**  | ✅ continued growth (+0.784%) — near Run 1's final 71.956% (ep=319); ~20ep ahead! |
+- **Status**: Running (ep=280 as of 2026-05-09 08:29; ep=299 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -97,15 +98,15 @@
 |-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | TBD | 69.73% | **70.30%** | **71.47%** | TBD |
 | 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.68%** | **65.82%** | TBD | TBD |
-| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | **70.62%** | TBD | TBD | TBD |
+| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | **70.62%** | **71.40%** | TBD | TBD |
 
-**Ranking at ep=259**: v3(**70.62%**) > v1(**69.73%**) >> v2(65.68%) — Run 3 (biases+LS) overtook Run 1 at ep=259!
+**Ranking at ep=279**: v3(**71.40%**) >> v2(65.82%) — Run 3 within 0.56% of Run 1 final (71.96%@ep=319)!
 - **Run 1 ep=319 = 71.96%**: FINISHED
-- **Run 3 ep=259 = 70.62%**: still growing (+1.84%); on track to potentially surpass Run 1 final
+- **Run 3 ep=279 = 71.40%**: only 0.56% behind Run 1's final; on track to surpass it by ep=310-320
 
 ## TODO / Next Steps (2026-05-09 05:41)
 - Run 2: ep=260, ep=279 eval upcoming
-- Run 3: ep=260, ep=279 eval upcoming — **70.62% at ep=259, LEADING Run 1!**
+- Run 3: ep=280, ep=299 eval upcoming — **71.40% at ep=279, closing on Run 1 final (71.96%)**
 - **Phase 2 Run A** (ep=160): **30.56%** — ep=179 upcoming; growth decelerating (1.25x vs 1.36x vs 1.47x)
 - **Phase 2 Run C** (ep=100): **26.15%/32.56%** — ep=119 upcoming; EXCEEDS Run A ep=139!
 - **Phase 2 Run D** (ep=100): **22.84%/29.12%** — ep=119 upcoming; behind C by 3.3pp
