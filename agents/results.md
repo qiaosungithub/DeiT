@@ -85,7 +85,8 @@
   | 199   | 66.254%      | ⚠️ slight dip (-0.09%) — essentially flat; v1 gap widening |
   | 219   | **67.156%**  | ✅ recovery (+0.90%) |
   | 239   | **68.784%**  | ✅ big jump (+1.63%) |
-- **Status**: Running (ep=253 as of 2026-05-09 05:41; ep=259 eval upcoming)
+  | 259   | **70.620%**  | ✅ BIG JUMP (+1.836%) — now AHEAD of Run 1 at ep=259 (69.726%)! biases+LS winning |
+- **Status**: Running (ep=260 as of 2026-05-09 06:22; ep=279 eval upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -95,15 +96,15 @@
 |-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | TBD | 69.73% | **70.30%** | **71.47%** | TBD |
 | 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.68%** | TBD | TBD | TBD |
-| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | TBD | TBD | TBD | TBD |
+| 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | **70.62%** | TBD | TBD | TBD |
 
-**Ranking at ep=239/254**: v1 FINISHED(71.96%) >> v3(**68.78%**@239) > v2(65.36%@239) — Runs 2&3 at ep=254/253, ep=259 upcoming
-- **Run 1 ep=319 = 71.96%**: FINISHED (ep=329 not reached in schedule)
-- **Run 2 ep=254, Run 3 ep=253**: both approaching ep=259 eval
+**Ranking at ep=259**: v3(**70.62%**) > v1(**69.73%**) >> v2(65.68%) — Run 3 (biases+LS) overtook Run 1 at ep=259!
+- **Run 1 ep=319 = 71.96%**: FINISHED
+- **Run 3 ep=259 = 70.62%**: still growing (+1.84%); on track to potentially surpass Run 1 final
 
 ## TODO / Next Steps (2026-05-09 05:41)
 - Run 2: ep=260, ep=279 eval upcoming
-- Run 3: ep=258, ep=259 eval upcoming (~10min)
+- Run 3: ep=260, ep=279 eval upcoming — **70.62% at ep=259, LEADING Run 1!**
 - **Phase 2 Run A** (ep=140): **24.44%** — ep=159 eval upcoming
 - **Phase 2 Run C** (ep=81): **17.94%/23.92%** — leading; ep=99 eval upcoming (~2hr)
 - **Phase 2 Run D** (ep=80): **15.71%/21.53%** — behind C; ep=99 eval upcoming (~2hr)
