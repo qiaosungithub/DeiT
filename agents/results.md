@@ -107,7 +107,7 @@
 - Run 3: ep=260, ep=279 eval upcoming — **70.62% at ep=259, LEADING Run 1!**
 - **Phase 2 Run A** (ep=140): **24.44%** — ep=159 eval upcoming
 - **Phase 2 Run C** (ep=100): **26.15%/32.56%** — ep=119 upcoming; EXCEEDS Run A ep=139!
-- **Phase 2 Run D** (ep=97): ep=99 eval incoming in ~10min
+- **Phase 2 Run D** (ep=100): **22.84%/29.12%** — ep=119 upcoming; behind C by 3.3pp
 - **Phase 2 Run E**: READY TO LAUNCH — axuxm0 already IDLE+MOUNTED (Run 1 finished)
   - User run: `tpu run kmh-tpuvm-v6e-8-spot-gzy-axuxm0 sqa dir=7 --config=configs/load_config.py:remote_run_E`
   - Config: configs/remote_run_config_E.yml (zero-init out_proj, uniform schedule)
@@ -219,6 +219,8 @@
   | 39    | **2.258%**   | **0.638** | **4.074%**        | 1.632%            | ✅ 6.9x single, 7.7x iter vs ep=19; slightly ahead of C (2.12%/3.96%); invalid rate improved |
   | 59    | **8.456%**   | **0.591** | **12.456%**       | 2.702%            | ⚠️ now BEHIND C (9.18%/14.04%) — uniform schedule overtook logit-normal |
   | 79    | **15.706%**  | **0.548** | **21.532%**       | 0.858%            | ⚠️ still behind C (17.94%/23.92%) — gap widening; uniform schedule consistently better |
+  | 99    | **22.842%**  | **0.512** | **29.124%**       | 2.104%            | ⚠️ behind C (26.15%/32.56%) by 3.3%/3.4% — gap growing vs ep=79 (2.2%/2.4%) |
+- **Status**: ✅ Running (ep=100 as of 2026-05-09 07:45; ep=119 eval upcoming)
 
 ### Run E — ViT_base_mdh_zero_init (zero-init out_proj, uniform schedule)
 - **Window**: TBD (not yet launched)
