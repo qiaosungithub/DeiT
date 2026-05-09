@@ -96,10 +96,9 @@ def load_backbone_params(state, load_backbone_from, workdir):
   # Recursively copy checkpoint values, preserving the Phase 2 tree structure.
   # This tolerates minor structure differences (missing bias, extra nesting, etc.)
   _recursive_copy(current, backbone_params)
-  new_params = freeze(current)
-  # Reset optimizer state to zeros, preserving the existing frozen params tree structure.
-  # We cannot call tx.init(new_params) because the WD mask (built from plain dicts in
-  # create_train_state) is incompatible with FrozenDict params. Instead, zero the
-  # existing opt_state (which has the correct frozen structure) and set step=0.
-  new_opt_state = jax.tree_util.tree_map(jnp.zeros_like, state.opt_state)
+  # state.params is a plain dict (not FrozenDict); keep it that way.
+  new_params = current
+  # Reinit optimizer state from scratch with the new params (plain dicts).
+  # state.tx was built with no_wd_mask as plain dicts, so tx.init(plain dict) is correct.
+  new_opt_state = state.tx.init(new_params)
   return state.replace(params=new_params, opt_state=new_opt_state, step=0)
