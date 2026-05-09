@@ -104,12 +104,12 @@
 - **Run 1 ep=319 = 71.96%**: FINISHED
 - **Run 3 ep=279 = 71.40%**: only 0.56% behind Run 1's final; on track to surpass it by ep=310-320
 
-## TODO / Next Steps (2026-05-09 05:41)
-- Run 2: ep=260, ep=279 eval upcoming
-- Run 3: ep=280, ep=299 eval upcoming — **71.40% at ep=279, closing on Run 1 final (71.96%)**
-- **Phase 2 Run A** (ep=160): **30.56%** — ep=179 upcoming; growth decelerating (1.25x vs 1.36x vs 1.47x)
-- **Phase 2 Run C** (ep=100): **26.15%/32.56%** — ep=119 upcoming; EXCEEDS Run A ep=139!
-- **Phase 2 Run D** (ep=100): **22.84%/29.12%** — ep=119 upcoming; behind C by 3.3pp
+## TODO / Next Steps (2026-05-09 09:37)
+- Run 2: ep=288; ep=299 eval in ~76 min
+- Run 3: ep=287; ep=299 eval in ~82 min — **71.40% at ep=279, closing on Run 1 final (71.96%)**
+- **Phase 2 Run A** (ep=168): **30.56%** — ep=179 eval in ~74 min; growth decelerating (1.25x vs 1.36x vs 1.47x)
+- **Phase 2 Run C** (ep=120): **33.28%/39.14%** — ep=139 upcoming; EXCEEDS Run A ep=159 (30.56%)! 40ep advantage holds
+- **Phase 2 Run D** (ep=114): **22.84%/29.12%** — ep=119 eval in ~36 min; behind C by ~10pp
 - **Phase 2 Run E**: READY TO LAUNCH — axuxm0 already IDLE+MOUNTED (Run 1 finished)
   - User run: `tpu run kmh-tpuvm-v6e-8-spot-gzy-axuxm0 sqa dir=7 --config=configs/load_config.py:remote_run_E`
   - Config: configs/remote_run_config_E.yml (zero-init out_proj, uniform schedule)
@@ -202,7 +202,8 @@
   | 59    | **9.180%**   | **0.586** | **14.042%**       | 2.808%            | ✅ 4.3x single, 3.5x iter vs ep=39; ACCELERATION |
   | 79    | **17.944%**  | **0.538** | **23.924%**       | 0.942%            | ✅ 1.95x single, 1.70x iter vs ep=59; matches Run A ep=119 (17.95%) in just 79ep!
   | 99    | **26.146%**  | **0.494** | **32.562%**       | 2.006%            | ✅ 1.46x single, 1.36x iter vs ep=79; EXCEEDS Run A ep=139 (24.44%) — ~40ep advantage |
-- **Status**: ✅ Running (ep=100 as of 2026-05-09 07:35; ep=119 eval upcoming)
+  | 119   | **33.276%**  | **0.461** | **39.138%**       | 1.430%            | ✅ 1.27x single, 1.20x iter vs ep=99; EXCEEDS Run A ep=159 (30.56%) — 40ep advantage holds |
+- **Status**: ✅ Running (ep=120 as of 2026-05-09 09:37; ep=139 eval upcoming)
 
 ### Run D — ViT_base_mdh (FIXED: no mixup, logit-normal mask schedule)
 - **Window**: 6364
