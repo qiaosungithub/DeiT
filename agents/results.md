@@ -60,7 +60,8 @@
   | 259   | **65.678%**  | ✅ slow growth (+0.32%) — decelerating |
   | 279   | **65.822%**  | ⚠️ near-flat (+0.14%) — approaching plateau; no-LS hurts late training |
   | 299   | **65.660%**  | ⚠️ DROPPED (-0.16%) — confirmed plateau/oscillation; no-LS run stagnated |
-- **Status**: ✅ Running (ep=300 as of 2026-05-09 10:30; ep=319 eval upcoming)
+  | 319   | **65.958%**  | ⚠️ tiny tick (+0.30%) — still plateaued ~66%; no-LS run effectively converged |
+- **Status**: ✅ Running (ep=320 as of 2026-05-09 12:37; final ep=329 upcoming)
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_023930_kq4hfm_kmh-tpuvm-v6e-8-spot-gzy-p1u4mx_asia-northeast1-b__b_lr_ep_eval`
 
 ---
@@ -99,7 +100,7 @@
 | Run | qkv_bias | ln_bias | LearnedScale | ep19  | ep39   | ep59  | ep79  | ep99  | ep119 | ep139 | ep159 | ep179 | ep199 | ep219 | ep259 | ep279 | ep299 | ep330 |
 |-----|----------|---------|--------------|-------|--------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | 1 (ViT_base)   | False | False | True  | 42.9% | 56.7%  | 60.6% | 62.4% | 64.4% | 64.42% | 63.9%⚠️ | 65.41% | 66.80% | 68.07% | TBD | 69.73% | **70.30%** | **71.47%** | TBD |
-| 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.68%** | **65.82%** | **65.66%**⚠️ | TBD |
+| 2 (ViT_base_v2)| True  | True  | False | 42.1% | 55.0%  | 59.3% | 61.15%| 60.03%⚠️| 62.05% | 63.01% | 64.08% | 63.03%⚠️ | 63.61% | 64.40% | **65.68%** | **65.82%** | **65.66%**⚠️ | **65.96%** |
 | 3 (ViT_base_v3)| True  | True  | True  | 43.9% | 56.84% | 61.2% | 61.85%| 64.22% | 64.69% | 64.68% | 65.86% | 66.35% | 66.25%⚠️ | 67.16% | **70.62%** | **71.40%** | **72.77%** | TBD |
 
 **Ranking at ep=299**: v3(**72.77%**) >> v1(71.47%@ep=299 FINISHED) >> v2(65.66%⚠️ plateaued)
