@@ -172,11 +172,17 @@ After each experiment completes:
 - **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
 - **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
 
-## Phase 2 Progress Summary (as of 2026-05-09 ~03:00)
+## Phase 2 Progress Summary (as of 2026-05-09 ~03:38)
 
 | Run | Architecture | ep | single-step | iter | notes |
 |-----|-------------|-----|-------------|------|-------|
-| A | attention head, mixup BUG | 99 | **12.21%** | N/A | learning fast despite old code |
-| C | attention head, no-mixup | 52 | ~est 6-9% | ~est 12-18% | fixed code, 4x ahead of A at ep=39 |
-| D | attention head, logit-normal | 51 | ~est 6-9% | ~est 12-18% | slightly ahead of C at ep=39 |
-| E | attention head, zero-init | TBD | TBD | TBD | READY TO LAUNCH |
+| A | attention head, mixup BUG | 113 | ~15%? | N/A | old code; ep=99=12.21%, ep=119 upcoming |
+| C | attention head, uniform | 60 | **9.18%** | **14.04%** | LEADING; 4.3x jump ep39→59; uniform > logit-normal |
+| D | attention head, logit-normal | 60 | 8.46% | 12.46% | slightly behind C at ep=59; logit-normal inferior |
+| E | attention head, zero-init | TBD | TBD | TBD | alias registered; user needs to ftmd+tpu_run |
+| F | MLP head baseline | TBD | TBD | TBD | config ready; launch when slot opens (limit=8, 7 running) |
+| G | large head (512-dim, 4L) | TBD | TBD | TBD | config ready; launch when slot opens |
+
+**Key finding ep=59**: uniform mask schedule (C) now ahead of logit-normal (D) by ~8% relative.
+- Trajectory C: 0.28% → 2.12% → **9.18%** (roughly 4x per 20 epochs so far, decelerating)
+- Projection: ep=79 may reach ~25-35%; ep=99 may reach ~50%+ (Run A was 12.21% at ep=99 with OLD code)

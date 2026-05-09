@@ -182,13 +182,14 @@
 - **Key fixes**: no mixup/cutmix in training, iterative eval (4-step), uniform mask schedule, b2=0.95
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_211542_1ekprl_kmh-tpuvm-v6e-8-spot-gzy-yq00yh_us-east5-b__b_lr_ep_eval`
 - **Early signal**: step=200 train_accuracy=**8.4%** (vs ~0.1% same point in Runs A/B) — NO-MIXUP FIX WORKING 🚀
-- **Status**: ✅ Running (ep~52 as of 2026-05-09 02:46; ep=59 eval upcoming)
+- **Status**: ✅ Running (ep=59.3 as of 2026-05-09 03:30; ep=79 eval upcoming)
 - **Eval checkpoints**:
   | epoch | eval_accuracy | eval_loss | eval_accuracy_iter | eval_invalid_rate | notes |
   |-------|--------------|-----------|-------------------|-------------------|-------|
   | 0     | 0.090%       | 0.681     | 0.186%            | 0.000%            | near random — expected at ep=0 |
   | 19    | **0.282%**   | 0.682     | **0.478%**        | 0.000%            | ✅ 3.1x single-step, 2.6x iter vs ep=0; outperforms Run A/B at ep=19 (0.186%, 0.134%) |
   | 39    | **2.122%**   | **0.640** | **3.958%**        | 2.242%            | ✅ 7.5x single, 8.3x iter vs ep=19; 4x ahead of Run A at same epoch! |
+  | 59    | **9.180%**   | **0.586** | **14.042%**       | 2.808%            | ✅ 4.3x single, 3.5x iter vs ep=39; ACCELERATION — approaching Run A ep=99 (12.2%) |
 
 ### Run D — ViT_base_mdh (FIXED: no mixup, logit-normal mask schedule)
 - **Window**: 6364
@@ -199,13 +200,14 @@
 - **Architecture**: same as Run C
 - **Key fixes**: no mixup/cutmix, iterative eval (4-step), logit_normal mask schedule, b2=0.95
 - **LogDir**: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_212230_hc12e8_kmh-tpuvm-v6e-8-spot-gzy-8507kk_us-east5-b__b_lr_ep_eval`
-- **Status**: ✅ Running (ep~51 as of 2026-05-09 02:46; ep=59 eval upcoming)
+- **Status**: ✅ Running (ep=59.9 as of 2026-05-09 03:38; ep=79 eval upcoming)
 - **Eval checkpoints**:
   | epoch | eval_accuracy | eval_loss | eval_accuracy_iter | eval_invalid_rate | notes |
   |-------|--------------|-----------|-------------------|-------------------|-------|
   | 0     | 0.130%       | 0.682     | 0.192%            | 0.286%            | near random |
   | 19    | **0.326%**   | **0.680** | **0.532%**        | 5.120%            | ✅ 2.5x single, 2.8x iter vs ep=0; slightly AHEAD of C (0.282%/0.478%); high invalid rate from logit-normal OOD |
   | 39    | **2.258%**   | **0.638** | **4.074%**        | 1.632%            | ✅ 6.9x single, 7.7x iter vs ep=19; slightly ahead of C (2.12%/3.96%); invalid rate improved |
+  | 59    | **8.456%**   | **0.591** | **12.456%**       | 2.702%            | ⚠️ now BEHIND C (9.18%/14.04%) — uniform schedule overtook logit-normal |
 
 ### Run E — ViT_base_mdh_zero_init (zero-init out_proj, uniform schedule)
 - **Window**: TBD (not yet launched)
@@ -215,8 +217,8 @@
 - **Config**: `configs/remote_run_config_E.yml`
 - **Architecture**: ViT_base_mdh_zero_init (biases+LS+diffusion head, head_zero_init_proj=True)
 - **Key change vs Run C**: zero-init kernel for out_proj (2-layer head); all other settings identical
-- **Status**: ⏳ READY TO LAUNCH — need user to register alias v6e-8-tmp207 for i91hh1
-  - Run: `ftmd kmh-tpuvm-v6e-8-spot-gzy-i91hh1 v6e-8-tmp207; tpu run kmh-tpuvm-v6e-8-spot-gzy-i91hh1 sqa dir=7 --config=configs/load_config.py:remote_run_E`
+- **Status**: ⏳ READY TO LAUNCH — alias v6e-8-tmp207 registered ✅; user needs to run ftmd+tpu_run
+  - Run: `ftmd kmh-tpuvm-v6e-8-spot-gzy-i91hh1 v6e-8-tmp207 && tpu run kmh-tpuvm-v6e-8-spot-gzy-i91hh1 sqa dir=7 --config=configs/load_config.py:remote_run_E`
 
 ---
 
