@@ -177,23 +177,64 @@ After each experiment completes:
 - **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
 - **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
 
-## Phase 2 Progress Summary (as of 2026-05-09 18:21)
+## Phase 2 Progress Summary (as of 2026-05-09 20:21)
 
-| Run | Architecture | ep | single-step | iter | notes |
-|-----|-------------|-----|-------------|------|-------|
-| A | attention head, mixup BUG | 186⚠️ | 37.25% | N/A | PREEMPTED ~11:07; auto-resume pending |
-| C | attention head, uniform | 134⚠️ | 33.28% | 39.14% | PREEMPTED ~11:07; auto-resume pending |
-| D | attention head, logit-normal | 132⚠️ | 28.72% | 34.98% | PREEMPTED ~11:07; behind C by 4.6pp |
-| E | attention head, zero-init | - | - | - | axuxm0 IDLE+MOUNTED; needs tpu_run |
-| F | MLP head baseline | - | - | - | 3djlis IDLE+MOUNTED; needs ftmd+tpu_run |
-| G | large head (512-dim, 4L) | - | - | - | 06q7u9 IDLE+MOUNTED; needs ftmd+tpu_run |
-| H | attention + aux CE (λ=0.1) | - | - | - | qxxa8y IDLE+MOUNTED; needs ftmd+tpu_run |
-| I | pretrained backbone + diff head | 0 | - | - | ✅ RUNNING (window 6375, launched 18:17); train_loss=0.692@step100 |
+| Run | Architecture | TPU | Window | Status | notes |
+|-----|-------------|-----|--------|--------|-------|
+| A | attention head, mixup BUG | c8umw4 (us-east5-b) | 6352 | ⚠️ ERROR | Preempted; TPU deleted |
+| C | attention head, uniform | yq00yh (us-east5-b) | 6363 | ⚠️ ERROR | Preempted; TPU deleted |
+| D | attention head, logit-normal | 8507kk (us-east5-b) | 6364 | ⚠️ ERROR | Preempted; TPU deleted |
+| E | attention head, zero-init | axuxm0 | 6377 | ✅ RUNNING | Restarted fresh ep=0; logdir `20260509_200405_88jyh8_...axuxm0...` |
+| F | MLP head baseline | 3djlis | 6375 | ✅ RUNNING | ep~1.5; logdir `20260509_200228_jwwv8y_...3djlis...` |
+| G | large head (512-dim, 4L) | 06q7u9 | 6376 | ✅ RUNNING | ep~1.4; logdir `20260509_200306_h9blvq_...06q7u9...` |
+| H | attention + aux CE (λ=0.1) | qxxa8y | 6372 | ✅ RUNNING | ep=0 launching; logdir `20260509_202006_qqjdbo_...qxxa8y...` |
+| I | pretrained backbone + diff head | j3rqvs | 6378 | ✅ RUNNING | Resumed from ep~8; logdir `20260509_195827_ote0gj_...j3rqvs...` |
+| sanity | ViT_base_v3 (full align) | p1u4mx | 6378 | ✅ RUNNING | ep=0 launching; logdir `20260509_201805_rtww0x_...p1u4mx...` |
 
 **Phase 1 COMPLETE**: Run 3 (biases+LS) = **73.14%** BEST, Run 1 = 71.96%, Run 2 = 65.96%.
-**Run I**: ✅ RUNNING on j3rqvs (window 6375). Logdir: `20260509_181720_6b9dpm_...j3rqvs...`
-**Run A/C/D**: Preempted by us-east5-b spot wave (~11:07). Machines deleted. MONITOR.py searching.
-**Uniform schedule definitively beats logit-normal** (Run C vs D): gap 4.6pp at ep=119.
+**Run A/C/D**: TPUs deleted (us-east5-b spot wave). No auto-resume possible; abandoned.
+**Sanity run**: New run testing full alignment with reference (WD mask, b2=0.999, LR schedule, CLS init, stochastic depth linear, final LN bias) — target 81.8%.
+**All 6 Phase 2 slots filled** as of 20:21.
+
+## MONITOR.py Auto-Resume Pipeline (2026-05-09)
+
+MONITOR.py lives at `/kmh-nfs-ssd-us-mount/code/qiao/work/tpu_manager/MONITOR.py`.
+
+### Job classification
+`_is_gpt_b_job(job)` checks if `'deit'` is in the job's wandb_notes string. Jobs classified as DeiT get routed to v6e-8 TPUs. **This is why wandb_notes must contain 'deit' for auto-resume to work.**
+
+### Auto-resume flow
+1. `mainloop()` runs periodically, calls `python tpu.py check sqa` to find Error-status windows.
+2. `check_job_status(job)` checks the error type: `preempted`, `deleted`, `tpu_still_exists`, or `resume_next_round`.
+3. For `preempted` jobs: detects via gcloud status → finds idle v6e-8 TPU → runs `ftmd + tpu run`.
+4. For `resume_next_round` jobs (seen error last round, TPU still alive): runs `tpu resume` or `tpu rerun` directly.
+
+### Queue system
+`queue.json` holds pending jobs. `_process_queue()` is called each loop iteration.
+- `_get_queue_job_wandb_notes()` reads from **`configs/remote_run_config.yml`** specifically (not the actual launched config). This is the file that must be kept up-to-date.
+
+### Manual resume
+```bash
+python /kmh-nfs-ssd-us-mount/code/qiao/work/tpu_manager/tpu.py resume sqa window=<W> tpu=<full_tpu_name>
+```
+This calls `jobs.resume_rerun_job(job, load_ckpt=True)` which:
+1. Looks up the job's `stage_dir` and `extra_configs` from data.json
+2. Creates a new tmux window
+3. SSHes to the TPU and runs from the staged dir with `--config.load_from=<log_dir>`
+
+### Launch convention (IMPORTANT)
+**Always copy the experiment config to `remote_run_config.yml` before launching**, then launch with `--config=configs/load_config.py:remote_run`. This ensures `tpu.py check` shows the correct tag.
+
+```bash
+cp configs/remote_run_F_config.yml configs/remote_run_config.yml
+tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.py:remote_run
+```
+
+### Gotchas
+- `staging.sh` blocks until the remote training completes (gcloud ssh blocks). Queued shell commands execute only after the preceding job finishes (could be 330 epochs later).
+- MONITOR.py only tracks jobs registered via `tpu run` in data.json. Direct `source staging.sh` launches are invisible to MONITOR.py.
+- `tpu.py resume` correctly handles checkpoint loading by appending `--config.load_from=<logdir>` to `extra_configs`.
+- Don't pass `--config.load_from` manually to `staging.sh` — it causes `flag defined twice` error.
 
 ## New Feature: load_backbone_from (2026-05-09)
 - Config field `load_backbone_from` in default.py

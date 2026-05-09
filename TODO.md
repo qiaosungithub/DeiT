@@ -1,63 +1,64 @@
 # DeiT Research TODO
 
-## Priority 1: Reproduce 81.8% Baseline (BLOCKING)
-
-Our best Phase 1 result is only 73.14% (vs target 81.8%). Need to align with the working reference implementation at `../papers/DeiT/`.
-
-### Identified Gaps (from code diff, 2026-05-09)
-
-- [ ] **Weight decay mask** (HIGH): Reference applies `get_no_weight_decay_dict` — no WD on `cls`, `pos_emb`, `bias`, `scale` params. Our current code has NO masking (WD applies everywhere). This is a standard ViT training trick and likely a significant contributor to the gap.
-- [ ] **b2=0.999** (HIGH): Reference AdamW uses `b2=0.999` (standard). Ours defaults to `b2=0.95`. Need to set `adamw_b2=0.999` in the new baseline config.
-- [ ] **LR schedule** (MEDIUM): Reference uses custom schedule: const `1e-6` for epoch 0, linear warmup epochs 1-5, then cosine to 1e-5 over epochs 5-320, then const 1e-5 for last 10. Ours uses `warmup_cosine_decay_schedule` starting from 0. Should align.
-- [ ] **Patch embedding init** (MEDIUM): Reference uses torch-style `Uniform(-1/sqrt(in), 1/sqrt(in))` via `EmbedLinear`. Ours uses `truncated_normal(0.02)`. The patch embedding is a key learned component.
-- [ ] **CLS token init** (LOW): Reference `normal(1e-6)`, ours `truncated_normal(0.02)`.
-- [ ] **randperm before mixup** (LOW): Reference shuffles the batch before applying Mixup/CutMix.
-- [ ] **WandB notes**: Fill in meaningful notes for all run configs before launch.
-
-### Action Plan
-
-1. Create a new `ViT_base_v4` architecture in `models.py` that matches the reference exactly:
-   - `EmbedLinear`-style patch embedding init
-   - `cls` init: `normal(1e-6)`
-   - All other params: same as `ViT_base_v3` (biases=True, LearnedScale=True)
-2. Add `get_no_weight_decay_dict` to `train.py` and wire into AdamW.
-3. Fix LR schedule to match reference.
-4. Set `b2=0.999` in the sanity run config.
-5. Add randperm in `input_pipeline.py`.
-6. Create `configs/remote_run_v4_config.yml` and launch sanity run.
-7. Monitor ep=19/39 — expect >55% if aligned (reference hit 81.8%).
+_Last updated: 2026-05-09 20:45_
 
 ---
 
-## Priority 2: Phase 2 Masked Diffusion Head — Remaining Experiments
+## Priority 1: Sanity Run — Reproduce 81.8%
 
-Run I is launched. Runs E/F/G/H still need to be started. Machines reportedly IDLE+MOUNTED.
+**Status**: ✅ RUNNING on favaxa (window 6372). Logdir: `20260509_204009_1oz5ex_...favaxa...`
 
-| Run | Config | Machine | Status |
-|-----|--------|---------|--------|
-| E | zero-init out_proj, uniform | axuxm0 | IDLE+MOUNTED — needs `tpu run` |
-| F | MLP head baseline | 3djlis | IDLE+MOUNTED — needs `ftmd`+`tpu run` |
-| G | large head (512-dim, 4L) | 06q7u9 | IDLE+MOUNTED — needs `ftmd`+`tpu run` |
-| H | attention + aux CE (λ=0.1) | qxxa8y | IDLE+MOUNTED — needs `ftmd`+`tpu run` |
-| I | warm-start backbone | j3rqvs | ✅ Running (window 6375) |
+Alignment changes applied in commit `173d1bb`:
+- [x] Weight decay mask (no WD on cls/pos_emb/bias/scale)
+- [x] b2=0.999 (standard AdamW)
+- [x] LR schedule: tang(1e-6, ep0) → linear warmup → cosine → const(1e-5)
+- [x] CLS token init: normal(1e-6) instead of truncated_normal(0.02)
+- [x] Stochastic depth: linear per-layer schedule (not uniform)
+- [x] Final LayerNorm: use_bias=True (follows use_ln_bias flag)
+- [ ] Patch embedding init (EmbedLinear style): NOT YET done
+- [ ] randperm before mixup: NOT YET done
 
-- [ ] Verify machine states, then launch E/F/G/H.
-- [ ] Record ep=0 evals for all running Phase 2 jobs.
-
----
-
-## Priority 3: Monitor & Record
-
-- [ ] Monitor Run I for ep=0 eval (should show faster convergence than Run C due to warm-start).
-- [ ] Monitor Run A/C/D auto-resume from preemption (us-east5-b wave).
-- [ ] Update `agents/results.md` with all new evals as they come in.
+**Next**: Wait for ep=19 eval. Expect >60% if alignment is correct.
 
 ---
 
-## Gotchas Learned (update notes.md with these)
+## Priority 2: Phase 2 Experiments — All Launched
 
-- `aux_ce_loss_weight` defaults to 0.1 even when `head_aux_ce=False`. Always gate it: `aux_ce_loss_weight = config.get('aux_ce_loss_weight', 0.0) if config.get('head_aux_ce', False) else 0.0`.
-- `load_backbone_params` with `restore_checkpoint(target=None)` returns plain numpy dicts, not FrozenDicts. Must use `jnp.array()` conversion + reinit opt_state from new params.
-- `tpu` is a shell alias, not a binary. In scripts, use the full Python path from `~/.bash_aliases`.
-- WandB notes must be set — do not leave empty.
-- The reference DeiT uses weight decay masking (no WD on cls/pos_emb/bias/scale). Missing this likely costs multiple accuracy points.
+| Run | Config | Machine | Window | Status | Notes |
+|-----|--------|---------|--------|--------|-------|
+| E | zero-init out_proj, uniform | axuxm0 | 6377 | ✅ RUNNING | ep~5.6, fresh start |
+| F | MLP head baseline | 3djlis | 6375 | ✅ RUNNING | ep~5, step 6300 |
+| F-dup | MLP head (accident) | p1u4mx | (stream done) | ✅ RUNNING (remote) | Duplicate of F, will complete naturally |
+| G | large head (512-dim, 4L) | 06q7u9 | 6376 | ✅ RUNNING | ep~4.9, step 6100 |
+| H | attention + aux CE (λ=0.1) | qxxa8y | 6372 | ❌ FAILED | "not found in sheet" — user must register qxxa8y in spreadsheet |
+| I | warm-start backbone | j3rqvs | 6378 | ✅ RUNNING | ep~0, step 300 |
+
+**Blocker**: qxxa8y is not registered in the spreadsheet. User action needed.
+
+---
+
+## Priority 3: Resume Preempted Runs A/C/D
+
+Runs A/C/D were on us-east5-b spot TPUs that were deleted. These are abandoned — new runs (E/F/G/H/I) replaced them.
+
+---
+
+## Priority 4: Monitor & Record
+
+- [ ] Record ep=0 evals for E/F/G/I when they arrive
+- [ ] Watch sanity run ep=19 — target >60%
+- [ ] Update `agents/results.md` with all evals
+- [ ] If sanity run hits ~81.8%: update baseline config in main branch
+
+---
+
+## Known Issues & Gotchas
+
+- `aux_ce_loss_weight` must be gated on `head_aux_ce`. Already fixed in commit `faa44ba`.
+- `load_backbone_params`: must use `jnp.array()` to convert checkpoint values. Fixed in `e4fd44b`.
+- `tpu.py resume` appends `--config.load_from=<logdir>` to extra_configs — but if the original config already parses `load_from` as a field, this duplicates the flag. Workaround: launch fresh without resume.
+- **wandb_notes must contain 'deit'** for MONITOR.py auto-resume to classify job correctly.
+- **Always use `configs/remote_run_config.yml`** for launches so `tpu.py check` shows correct tags.
+- **`staging.sh` blocks until remote training completes** — queued shell commands run only after ~330 epochs.
+- **qxxa8y not in spreadsheet**: requires user to add it before Run H can launch successfully.
+- favaxa (v6e-8-tmp211) registered in data.json only; not in spreadsheet — if Run H needs to auto-resume it might also fail. Monitor.
