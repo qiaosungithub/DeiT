@@ -106,19 +106,19 @@
 - **Run 1 ep=319 = 71.96%**: FINISHED — SURPASSED by Run 3 at ep=299!
 - **Run 3 ep=299 = 72.77%**: LEADS Run 1 final by 0.81%; ep=319 eval upcoming — may reach ~73.5%+
 
-## TODO / Next Steps (2026-05-09 09:37)
-- Run 2: ep=288; ep=299 eval in ~76 min
-- Run 3: ep=287; ep=299 eval in ~82 min — **71.40% at ep=279, closing on Run 1 final (71.96%)**
-- **Phase 2 Run A** (ep=168): **30.56%** — ep=179 eval in ~74 min; growth decelerating (1.25x vs 1.36x vs 1.47x)
-- **Phase 2 Run C** (ep=120): **33.28%/39.14%** — ep=139 upcoming; EXCEEDS Run A ep=159 (30.56%)! 40ep advantage holds
-- **Phase 2 Run D** (ep=114): **22.84%/29.12%** — ep=119 eval in ~36 min; behind C by ~10pp
-- **Phase 2 Run E**: READY TO LAUNCH — axuxm0 already IDLE+MOUNTED (Run 1 finished)
-  - User run: `tpu run kmh-tpuvm-v6e-8-spot-gzy-axuxm0 sqa dir=7 --config=configs/load_config.py:remote_run_E`
-  - Config: configs/remote_run_config_E.yml (zero-init out_proj, uniform schedule)
-- **Phase 2 Runs F/G/H**: user needs ftmd+tpu_run (safety classifier blocks autonomous):
-  - Run F (MLP): `ftmd kmh-tpuvm-v6e-8-spot-gzy-3djlis v6e-8-tmp208 && tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.py:remote_run`
-  - Run G (large): `ftmd kmh-tpuvm-v6e-8-spot-gzy-06q7u9 v6e-8-tmp209 && tpu run kmh-tpuvm-v6e-8-spot-gzy-06q7u9 sqa dir=7 --config=configs/load_config.py:remote_run_G`
-  - Run H (aux CE): `ftmd kmh-tpuvm-v6e-8-spot-gzy-qxxa8y v6e-8-tmp210 && tpu run kmh-tpuvm-v6e-8-spot-gzy-qxxa8y sqa dir=7 --config=configs/load_config.py:remote_run_H`
+## TODO / Next Steps (2026-05-09 10:37)
+- **Phase 1 Run 2** (ep=300): plateaued at 65.66% — ep=319 upcoming, no change expected
+- **Phase 1 Run 3** (ep=300): **72.77%** — ep=319 upcoming; finishes ~13:47; Run I can start then
+- **Phase 2 Run A** (ep=180): **37.25%** — ep=199 eval in ~2h
+- **Phase 2 Run C** (ep=120): **33.28%/39.14%** — ep=139 upcoming ~1h; holding 40ep advantage over A
+- **Phase 2 Run D** (ep=120): **28.72%/34.98%** — ep=139 upcoming ~1.3h; trailing C by 4.6pp
+
+### Queued Launches (user action required — 3 slots free, limit=8)
+- **Run E** (zero-init, axuxm0 IDLE+MOUNTED): `tpu run kmh-tpuvm-v6e-8-spot-gzy-axuxm0 sqa dir=7 --config=configs/load_config.py:remote_run_E`
+- **Run F** (MLP, 3djlis IDLE+MOUNTED): `ftmd kmh-tpuvm-v6e-8-spot-gzy-3djlis v6e-8-tmp208 && tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.py:remote_run`
+- **Run G** (large head, 06q7u9 IDLE+MOUNTED): `ftmd kmh-tpuvm-v6e-8-spot-gzy-06q7u9 v6e-8-tmp209 && tpu run kmh-tpuvm-v6e-8-spot-gzy-06q7u9 sqa dir=7 --config=configs/load_config.py:remote_run_G`
+- **Run H** (aux CE, qxxa8y IDLE+MOUNTED, wait for P1 Run 2/3 to free slots): `ftmd kmh-tpuvm-v6e-8-spot-gzy-qxxa8y v6e-8-tmp210 && tpu run kmh-tpuvm-v6e-8-spot-gzy-qxxa8y sqa dir=7 --config=configs/load_config.py:remote_run_H`
+- **Run I** (pretrained backbone, launch after Phase 1 Run 3 finishes ~13:47): use p1u4mx or j3rqvs (freed after their runs finish); config: `configs/remote_run_I_config.yml`
 
 ---
 
