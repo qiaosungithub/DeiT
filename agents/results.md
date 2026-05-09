@@ -106,8 +106,8 @@
 - Run 2: ep=260, ep=279 eval upcoming
 - Run 3: ep=260, ep=279 eval upcoming — **70.62% at ep=259, LEADING Run 1!**
 - **Phase 2 Run A** (ep=140): **24.44%** — ep=159 eval upcoming
-- **Phase 2 Run C** (ep=81): **17.94%/23.92%** — leading; ep=99 eval upcoming (~2hr)
-- **Phase 2 Run D** (ep=80): **15.71%/21.53%** — behind C; ep=99 eval upcoming (~2hr)
+- **Phase 2 Run C** (ep=100): **26.15%/32.56%** — ep=119 upcoming; EXCEEDS Run A ep=139!
+- **Phase 2 Run D** (ep=97): ep=99 eval incoming in ~10min
 - **Phase 2 Run E**: READY TO LAUNCH — axuxm0 already IDLE+MOUNTED (Run 1 finished)
   - User run: `tpu run kmh-tpuvm-v6e-8-spot-gzy-axuxm0 sqa dir=7 --config=configs/load_config.py:remote_run_E`
   - Config: configs/remote_run_config_E.yml (zero-init out_proj, uniform schedule)
@@ -198,6 +198,8 @@
   | 39    | **2.122%**   | **0.640** | **3.958%**        | 2.242%            | ✅ 7.5x single, 8.3x iter vs ep=19; 4x ahead of Run A at same epoch! |
   | 59    | **9.180%**   | **0.586** | **14.042%**       | 2.808%            | ✅ 4.3x single, 3.5x iter vs ep=39; ACCELERATION |
   | 79    | **17.944%**  | **0.538** | **23.924%**       | 0.942%            | ✅ 1.95x single, 1.70x iter vs ep=59; matches Run A ep=119 (17.95%) in just 79ep!
+  | 99    | **26.146%**  | **0.494** | **32.562%**       | 2.006%            | ✅ 1.46x single, 1.36x iter vs ep=79; EXCEEDS Run A ep=139 (24.44%) — ~40ep advantage |
+- **Status**: ✅ Running (ep=100 as of 2026-05-09 07:35; ep=119 eval upcoming)
 
 ### Run D — ViT_base_mdh (FIXED: no mixup, logit-normal mask schedule)
 - **Window**: 6364
