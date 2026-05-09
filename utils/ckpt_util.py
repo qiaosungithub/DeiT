@@ -80,6 +80,7 @@ def load_backbone_params(state, load_backbone_from, workdir):
   for key, val in backbone_params.items():
     current[key] = jax.tree_util.tree_map(jnp.array, val)
   new_params = freeze(current)
-  # Reinit optimizer state so it matches new_params structure exactly.
-  new_opt_state = state.tx.init(new_params)
+  # Reinit optimizer state. optax.masked expects plain dicts (not FrozenDict),
+  # so unfreeze before init then re-store frozen params.
+  new_opt_state = state.tx.init(unfreeze(new_params))
   return state.replace(params=new_params, opt_state=new_opt_state, step=0)
