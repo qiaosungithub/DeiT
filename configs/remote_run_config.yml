@@ -1,14 +1,11 @@
-# Phase 1 Sanity Run: Full alignment with reference implementation
-# Changes from Phase 1 Run 3 (73.14%):
-# 1. Weight decay mask: no WD on cls/pos_emb/bias/scale (CRITICAL - was missing)
-# 2. b2=0.999 (reference standard, was 0.95)
-# 3. LR schedule: custom tang+warmup+cosine (matches reference exactly, was warmup_cosine_decay_schedule)
-# 4. CLS token init: normal(1e-6) (was truncated_normal(0.02))
-# 5. Stochastic depth: linear schedule 0→0.1 per layer (was uniform 0.1 everywhere)
-# 6. Final LayerNorm: use_bias=True (was False)
-# Architecture: ViT_base_v3 (biases=True, LearnedScale=True) — same best arch from Phase 1
+# Phase 2 Run I: attention head, warm-started from Phase 1 Run 3 backbone
+# Hypothesis: pretrained backbone (biases+LS, ~72% CE accuracy) gives faster convergence
+# and potentially higher final accuracy for the diffusion head.
+# NOTE: launch after Phase 1 Run 3 finishes (j3rqvs, ~ep=330 in ~6-8h from 2026-05-09 07:00)
 
-model: ViT_base_v3
+model: ViT_base_mdh
+
+load_backbone_from: /kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260508_024938_sxvz3e_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval
 
 dataset:
     num_workers: 16
@@ -18,7 +15,7 @@ dataset:
     rand_augment: rand-m9-mstd0.5-inc1
     reprob: 0.25
 
-    use_mixup_cutmix: true
+    use_mixup_cutmix: false
     mixup_prob: 1.0
     switch_prob: 0.5
     mixup_alpha: 0.8
@@ -35,18 +32,26 @@ log_per_step: 100
 
 optimizer: adamw
 weight_decay: 0.05
-adamw_b2: 0.999
+adamw_b2: 0.95
 dropout_rate: 0.0
 stochastic_depth_rate: 0.1
 grad_norm_clip: null
+
+use_diffusion_head: true
+head_type: attention
+head_inner_dim: 256
+head_n_layers: 2
+head_n_heads: 4
+head_aux_ce: false
+mask_schedule: uniform
+eval_iter_steps: 4
 
 logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
-    wandb_notes: 'sanity-run: full alignment with reference (WD mask, b2=0.999, LR schedule, cls init, stochastic depth schedule, final LN bias) — target 81.8%'
+    wandb_notes: 'phase2 Run I: warm-start diffusion head from Phase 1 Run 3 (73.14% CE backbone). Tests whether pretrained backbone accelerates convergence vs random-init (Run C).'
     wandb_tags:
         - sqa
-        - phase1-sanity
-        - wd-mask
-        - b2-0.999
+        - phase2
+        - warm-start

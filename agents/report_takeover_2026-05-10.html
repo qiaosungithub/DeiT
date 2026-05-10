@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeiT Project Report Update (2026-05-10)</title>
+  <style>
+    :root { --bg:#f7f8fa; --card:#fff; --text:#1f2937; --muted:#6b7280; --accent:#0f766e; --border:#e5e7eb; --warn:#b45309; --good:#166534; }
+    body { margin:0; font-family:"Segoe UI","PingFang SC","Noto Sans CJK SC",sans-serif; color:var(--text); background:linear-gradient(180deg,#eef6f5 0%,var(--bg) 260px); line-height:1.5; }
+    .wrap { max-width:1080px; margin:28px auto; padding:0 18px 40px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,0.04); }
+    h1,h2,h3 { margin:0 0 10px; }
+    h1 { font-size:24px; }
+    h2 { font-size:18px; color:var(--accent); }
+    h3 { font-size:15px; }
+    p { margin:8px 0; }
+    ul { margin:8px 0 0 20px; }
+    li { margin:4px 0; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    th,td { border:1px solid var(--border); padding:8px; text-align:left; vertical-align:top; }
+    th { background:#f3f4f6; }
+    .good { color:var(--good); font-weight:600; }
+    .warn { color:var(--warn); font-weight:600; }
+    .muted { color:var(--muted); }
+    code { background:#f3f4f6; border-radius:6px; padding:1px 5px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>DeiT Report Update</h1>
+      <p><strong>Date:</strong> 2026-05-10</p>
+      <p><strong>Update scope:</strong> 按最新决策重规划（不走 warm-start / aux CE 主线），并确认 sanity run 状态与后续 4 天收尾路线。</p>
+    </div>
+
+    <div class="card">
+      <h2>1. Sanity Run Status</h2>
+      <ul>
+        <li>Window: <code>6380</code>（tag: sanity-run full alignment, target 81.8%）。</li>
+        <li>Logdir: <code>/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260509_212142_mxfpdz_kmh-tpuvm-v6e-8-spot-gzy-favaxa_asia-northeast1-b__b_lr_ep_eval</code></li>
+        <li class="good">当前在持续训练中，不是挂起状态；最新日志时间到 2026-05-10 01:57 UTC，进度约 <strong>ep=43.56</strong>。</li>
+        <li>最近 eval: ep19=38.77%，ep39=54.47%。</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>2. 用户最新策略决策</h2>
+      <ul>
+        <li><strong>主线保持纯 diffusion</strong>：不把 warm-start backbone 和 aux CE 作为当前主方向。</li>
+        <li><strong>Ablation 1（最高优先级）</strong>：<code>n_masks_per_image=10</code>，单图一次 backbone forward，复用 CLS 训练 10 个 mask。</li>
+        <li><strong>Ablation 2</strong>：在去掉 mixup/cutmix 的 baseline 上，继续下调增强和正则（例如 wd / stochastic depth / randaugment / reprob / repeated aug）。</li>
+        <li><strong>Eval-only trick（后置）</strong>：多次生成 + majority vote。</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>3. 技术问题：Mask Ratio 下 Loss 求和还是平均</h2>
+      <p>当前实现（<code>masked_diffusion_loss</code>）是：对所有 masked token 的 CE 求和后，除以 masked token 总数（token-level mean）。</p>
+      <ul>
+        <li>形式：<code>L = sum_i sum_j m_ij * CE_ij / (sum_i sum_j m_ij)</code>。</li>
+        <li>效果：每个 masked token 权重相同；高 mask-ratio 样本因为 masked token 更多，整体贡献更大。</li>
+      </ul>
+      <p>可选替代：先做每样本 masked mean，再对 batch 平均（sample-level mean）。</p>
+      <ul>
+        <li>形式：<code>L = mean_i [ sum_j m_ij * CE_ij / max(sum_j m_ij,1) ]</code>。</li>
+        <li>效果：每个样本权重相同；但低 mask 样本会被相对放大，方差更大。</li>
+      </ul>
+      <p><strong>建议：</strong>先保留 token-level mean 作为主线（更稳，和常见 masked objective 一致），并把 sample-level mean 作为一个独立 ablation 开关验证。</p>
+    </div>
+
+    <div class="card">
+      <h2>4. K=10 多 Mask 的资源判断（粗估）</h2>
+      <ul>
+        <li>对 ViT-B + 2-layer diffusion head（dim=256）做数量级估算：<code>backbone:head</code> 激活量约 <strong>437:1</strong>，FLOPs 约 <strong>1000:1</strong>。</li>
+        <li>结论：K=10 主要放大的是小 head，整体仍由 backbone 主导，理论上可行。</li>
+        <li>执行策略：默认 K=10；若实测 OOM，降到 K=6，再降到 K=4。</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>5. 配置对齐原则（按 sanity run）</h2>
+      <ul>
+        <li>diffusion 配置默认继承 sanity 的优化训练范式（尤其是 lr schedule、WD mask、稳定初始化）。</li>
+        <li>与 sanity 的差异只保留 diffusion 必需项：<code>use_mixup_cutmix=false</code>，以及可控的增强/正则下调分支。</li>
+        <li>建议先统一把 diffusion 的 <code>adamw_b2</code> 固定为 <code>0.95</code>，避免额外变量。</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>6. 4-Day Revised Plan</h2>
+      <table>
+        <thead>
+          <tr><th>Day</th><th>动作</th><th>验收标准</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>D1</td>
+            <td>继续确保 sanity run 稳定推进；实现 K=10 multi-mask（含 OOM fallback 逻辑）。</td>
+            <td>代码可跑，吞吐/显存可记录，loss 下降速度优于 K=1 baseline。</td>
+          </tr>
+          <tr>
+            <td>D2</td>
+            <td>启动 Ablation-1：K=10 主线；并行 K=1 对照。</td>
+            <td>同等 epoch 下 train/eval 曲线有明确提速证据。</td>
+          </tr>
+          <tr>
+            <td>D3</td>
+            <td>启动 Ablation-2：低增强/低正则版本（去 RA、降 wd、降 sd）。</td>
+            <td>观察 early/mid epoch 是否刷点，且不过拟合过快。</td>
+          </tr>
+          <tr>
+            <td>D4</td>
+            <td>做 eval-only majority vote（多次采样投票）并出最终结论。</td>
+            <td>评估耗时可控，精度提升可复现。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>7. 额外 Brainstorm（低侵入、可快速验证）</h2>
+      <ul>
+        <li>iterative decode 的 step 数搜索（4/6/8）+ 固定解 mask 数 schedule。</li>
+        <li>loss reweight by mask-ratio（例如限制极端 t 权重）以降低训练方差。</li>
+        <li>invalid code 约束解码（对 1000..1023 做 reject/resample）用于 eval-only 刷点。</li>
+      </ul>
+      <p class="muted">Report file: <code>agents/report_takeover_2026-05-10.html</code></p>
+    </div>
+  </div>
+</body>
+</html>

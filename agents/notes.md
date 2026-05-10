@@ -158,7 +158,7 @@ After each experiment completes:
 - `tpu fang <new_machine> <alias>` requires the alias to already exist in data.json's `tpu_aliases`.
 - mount-disk lock file: `/tmp/xibo_mount_<tpu_name>.lock` — if stale, delete it and retry.
 - wandb `set_wandb` step may fail with local Python env issues (missing `annotated_types`) — this is non-critical, training still works.
-- **AdamW b2 = 0.95 (not 0.999)**: hardcoded in original code; now configurable via `--config.adamw_b2=0.999`. Reference DeiT uses b2=0.999. This may cause slight divergence from reference trajectory. When launching new runs, consider testing b2=0.999.
+- **AdamW b2 policy**: keep `adamw_b2=0.95` as the project default for stability (avoid 0.999 spike issues).
 - **Registered v6e-8 aliases**:
   - asia-northeast1-b: v6e-8-tmp201→j3rqvs, v6e-8-tmp202→axuxm0, v6e-8-tmp203→p1u4mx
   - us-east5-b: v6e-8-tmp51→c8umw4 (Phase 2 Run A), v6e-8-tmp52→cz2ivo (Phase 2 Run B), v6e-8-tmp53→8507kk (Run D), v6e-8-tmp205/206→yq00yh (Run C)
@@ -177,24 +177,30 @@ After each experiment completes:
 - **`remote_run_config.yml` had `use_mixup_cutmix: true`** — leftover bug that would have poisoned Run F (MLP baseline). Fixed to `false`. **All diffusion training configs must have `use_mixup_cutmix: false`.**
 - **`ViT_base_mdh_mlp` was removed** when the previous agent added MLPDiffusionHead but replaced it with ViT_debug incorrectly. Restored.
 
-## Phase 2 Progress Summary (as of 2026-05-09 20:21)
+## Phase 2 Progress Summary (as of 2026-05-09 22:15)
 
-| Run | Architecture | TPU | Window | Status | notes |
-|-----|-------------|-----|--------|--------|-------|
-| A | attention head, mixup BUG | c8umw4 (us-east5-b) | 6352 | ⚠️ ERROR | Preempted; TPU deleted |
-| C | attention head, uniform | yq00yh (us-east5-b) | 6363 | ⚠️ ERROR | Preempted; TPU deleted |
-| D | attention head, logit-normal | 8507kk (us-east5-b) | 6364 | ⚠️ ERROR | Preempted; TPU deleted |
-| E | attention head, zero-init | axuxm0 | 6377 | ✅ RUNNING | Restarted fresh ep=0; logdir `20260509_200405_88jyh8_...axuxm0...` |
-| F | MLP head baseline | 3djlis | 6375 | ✅ RUNNING | ep~1.5; logdir `20260509_200228_jwwv8y_...3djlis...` |
-| G | large head (512-dim, 4L) | 06q7u9 | 6376 | ✅ RUNNING | ep~1.4; logdir `20260509_200306_h9blvq_...06q7u9...` |
-| H | attention + aux CE (λ=0.1) | qxxa8y | 6372 | ✅ RUNNING | ep=0 launching; logdir `20260509_202006_qqjdbo_...qxxa8y...` |
-| I | pretrained backbone + diff head | j3rqvs | 6378 | ✅ RUNNING | Resumed from ep~8; logdir `20260509_195827_ote0gj_...j3rqvs...` |
-| sanity | ViT_base_v3 (full align) | p1u4mx | 6378 | ✅ RUNNING | ep=0 launching; logdir `20260509_201805_rtww0x_...p1u4mx...` |
+| Run | Architecture | TPU | Window | Status | ep=0 eval | notes |
+|-----|-------------|-----|--------|--------|-----------|-------|
+| A | attention head, mixup BUG | c8umw4 (us-east5-b) | 6352 | ❌ DEAD | 0.132% | Preempted; TPU deleted |
+| C | attention head, uniform | yq00yh (us-east5-b) | 6363 | ❌ DEAD | 0.090% | Preempted; TPU deleted |
+| D | attention head, logit-normal | 8507kk (us-east5-b) | 6364 | ❌ DEAD | 0.130% | Preempted; TPU deleted |
+| E | attention head, zero-init | axuxm0 | 6382 | ✅ RUNNING | 0.100% | ep~20; ep=19=**0.186%**/0.212%iter — near random, diffusion warmup slow |
+| F | MLP head baseline | 3djlis | 6375 | ✅ RUNNING | 0.206% | ep~48; ep=19=**5.58%**/9.67%; ep=39=**14.90%**/21.23% — MLP scales well early |
+| G | large head (512-dim, 4L) | 06q7u9 | 6383 | ✅ RUNNING | 0.108% | ep~20; ep=19=**0.162%**/0.238%iter — large head slower than baseline at ep=19 |
+| H | attention + aux CE (λ=0.1) | qxxa8y | 6381 | ✅ RUNNING | 0.100% | ep~35; ep=19=**23.83%**/28.00%iter 🚀 aux CE gives massive boost |
+| I | pretrained backbone + diff head | j3rqvs | 6388 | ✅ RUNNING | 0.184%/invalid=49.8% | ep~28; ep=19=**47.08%**/50.80%iter 🚀🚀 BEST — warm backbone dominates everything |
+| sanity | ViT_base_v3 (full align, CE) | favaxa | 6380 | ✅ RUNNING | 0.096% CE | ep~35; train_acc=37%, loss=4.41 — CE training progressing |
 
 **Phase 1 COMPLETE**: Run 3 (biases+LS) = **73.14%** BEST, Run 1 = 71.96%, Run 2 = 65.96%.
 **Run A/C/D**: TPUs deleted (us-east5-b spot wave). No auto-resume possible; abandoned.
-**Sanity run**: New run testing full alignment with reference (WD mask, b2=0.999, LR schedule, CLS init, stochastic depth linear, final LN bias) — target 81.8%.
-**All 6 Phase 2 slots filled** as of 20:21.
+**Sanity run**: ViT_base_v3 (CE) with full DeiT-B alignment — target 81.8%.
+**All 6 Phase 2 + sanity slots active** as of 22:15.
+
+## Critical Bugs Found and Fixed (2026-05-09, this session)
+
+- **Run E/G/I were all launched with wrong MLP config** (previous agent used Run F config for all). Fixed by killing wrong runs and relaunching with correct configs (commits 537e610, 37daeb8, 2f57c6c, 48514a4, 05264ce).
+- **`fc` not initialized during model.init()**: When `head_aux_ce=True`, `self.fc` was only called when `return_aux_ce=True`. During `model.init()` (default `return_aux_ce=False`), fc was never called, so params never included fc/kernel. Fix: always call `self.fc(cls)` when `head_aux_ce=True`, gate the return (not the call) on `return_aux_ce` (commit 537e610).
+- **`load_backbone_params` repeated failures**: Phase 1 Run 3 checkpoint has `final_ln: ['scale']` (no bias, despite `use_ln_bias=True` — trained before the fix), and `embedding: {'_model': ...}` nesting. Fixed with recursive copy that preserves Phase 2 param tree structure (commit 2f57c6c). Additionally: `state.params` is plain dict (not FrozenDict); using `freeze()` caused node type mismatches throughout (commit 05264ce).
 
 ## MONITOR.py Auto-Resume Pipeline (2026-05-09)
 
@@ -241,3 +247,75 @@ tpu run kmh-tpuvm-v6e-8-spot-gzy-3djlis sqa dir=7 --config=configs/load_config.p
 - In train.py: after state creation, if `load_backbone_from != ''`, calls `ckpt_util.load_backbone_params()`
 - `ckpt_util.load_backbone_params()`: loads raw checkpoint, copies all params except `fc`/`diffusion_head` into Phase 2 state, fresh optimizer state (step=0)
 - Run I config: `configs/remote_run_I_config.yml` — uses Phase 1 Run 3 logdir as `load_backbone_from`
+
+## 2026-05-10 Planning Update (Takeover)
+
+- Remaining time: **4 days**; single full run takes ~1 day+, so prioritize high-ROI changes only.
+- New P0 direction (user-proposed): **multi-mask per image with CLS reuse**.
+  - For each image, run backbone once to get CLS.
+  - Sample K different masks (`n_masks_per_image=K`), repeat CLS K times, train diffusion head on all K masks.
+  - Goal: increase diffusion supervision density ~Kx with limited overhead (mainly head compute, not backbone).
+- Priority plan:
+  1. Implement `n_masks_per_image` in diffusion train step (start K=2/4).
+  2. Mainline experiment: warm-start backbone + aux CE + multi-mask.
+  3. Keep uniform mask schedule default; deprioritize large-head/logit-normal expansions.
+
+
+## 2026-05-10 Re-Plan v2 (per user feedback)
+
+- User decision:
+  - Keep **pure diffusion** direction; do **not** prioritize aux CE multitask path ("投敌").
+  - `n_masks_per_image` target starts at **10** (maximize if memory allows).
+  - Also try reducing augmentation/regularization because diffusion convergence is slow.
+
+### Clarifications
+- `warm-start backbone` = initialize Phase-2 backbone weights from a finished Phase-1 CE checkpoint (`load_backbone_from`), while keeping diffusion head randomly initialized.
+- `multitask` here means optimizing two losses together on shared backbone: diffusion bit loss + CE loss. This equals the `head_aux_ce` branch and is deprioritized now.
+
+### Memory/Compute rough estimate for multi-mask
+- For ViT-B/16 + 2-layer diffusion head (256-dim):
+  - rough activation-element ratio: `backbone : head ≈ 437 : 1`
+  - rough FLOPs ratio: `backbone : head ≈ 1000 : 1`
+- Implication:
+  - `K=10` adds ~`10/437 ≈ 2.3%` activation-equivalent overhead (rough)
+  - head compute still far below backbone compute
+  - practical bottleneck may come from framework buffers / sharding, not head math itself
+- Plan: set `n_masks_per_image=10` first; if OOM then fallback to `K=6` then `K=4`.
+
+### New priority (4 days)
+1. Implement and run `K=10` multi-mask with CLS reuse (encode once, train head on 10 masks/image).
+2. Mainline = warm-start backbone + pure diffusion + multi-mask (no aux CE).
+3. Regularization/augmentation down-tuning run:
+   - `dataset.use_rand_augment: false`
+   - `dataset.reprob: 0.0`
+   - `dataset.repeated_aug: 1`
+   - `weight_decay: 0.02` (or 0.0 as aggressive variant)
+   - `stochastic_depth_rate: 0.05` (or 0.0 as aggressive variant)
+   - note: with pure diffusion loss, `dataset.label_smoothing` has near-zero effect because labels are converted by argmax.
+
+
+## 2026-05-10 Execution Update (after user clarification)
+
+- **Sanity run (window 6380) check**:
+  - Logdir: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260509_212142_mxfpdz_kmh-tpuvm-v6e-8-spot-gzy-favaxa_asia-northeast1-b__b_lr_ep_eval`
+  - Active training confirmed at `2026-05-10 01:57 UTC`, around `ep=43.56` (not stalled, no manual resume needed now).
+  - Latest evals in log: `ep19=38.77%`, `ep39=54.47%`.
+
+- User direction update:
+  - Do **not** prioritize warm-start/aux-CE mainline (considered "投敌").
+  - Highest-priority ablation remains `n_masks_per_image=10` with CLS reuse.
+  - Second ablation: further reduce augmentation/regularization on top of no-mixup baseline.
+  - Add technical ablation: diffusion loss normalization variant (`token_mean` vs `sample_mean`).
+  - Final-stage eval-only trick: multi-sample majority vote decoding.
+
+- Loss normalization note:
+  - Current implementation uses masked-token mean:
+    `sum(mask * CE) / sum(mask)`.
+  - This implicitly gives higher weight to higher mask-ratio samples.
+  - Keep as default for stability; add `sample_mean` as explicit ablation option.
+
+- Config updates applied locally:
+  - Unified diffusion config `adamw_b2` to `0.95` in `default.py` and all `remote_run*.yml` variants.
+  - Added low-aug configs for ablation-2:
+    - `configs/remote_run_J_low_aug_config.yml` (mild)
+    - `configs/remote_run_K_low_aug_aggressive_config.yml` (aggressive)
