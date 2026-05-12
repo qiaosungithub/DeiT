@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Masked Diffusion Head for DeiT / ImageNet-22K Handoff</title>
+  <style>
+    :root { --bg:#f6f2e8; --card:#fffdf8; --ink:#1f241f; --muted:#657067; --line:#ddd2bd; --accent:#0f766e; --warn:#a16207; --bad:#9f1239; --good:#166534; }
+    body { margin:0; background:linear-gradient(135deg,#f6f2e8,#eef7f2); color:var(--ink); font-family:"Aptos","Source Han Sans SC","PingFang SC",sans-serif; line-height:1.55; }
+    .wrap { max-width:1180px; margin:0 auto; padding:34px 18px 60px; }
+    .card { background:rgba(255,253,248,.94); border:1px solid var(--line); border-radius:18px; padding:18px 22px; margin:14px 0; box-shadow:0 8px 28px rgba(60,45,20,.07); }
+    h1 { font-size:34px; margin:0 0 8px; letter-spacing:-.02em; }
+    h2 { color:var(--accent); font-size:21px; margin:0 0 10px; }
+    h3 { color:#7a4b1d; font-size:16px; margin:14px 0 8px; }
+    p { margin:8px 0; }
+    ul { margin:8px 0 0 20px; padding:0; }
+    li { margin:4px 0; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+    th,td { border:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
+    th { background:#efe7d8; }
+    code { background:#eee5d5; border:1px solid #dfd2bb; border-radius:6px; padding:1px 5px; font-family:"Cascadia Mono",Consolas,monospace; font-size:12px; }
+    pre { background:#201f1c; color:#f8f4e8; padding:14px; border-radius:12px; overflow:auto; font-size:12px; }
+    .good { color:var(--good); font-weight:700; } .warn { color:var(--warn); font-weight:700; } .bad { color:var(--bad); font-weight:700; } .muted { color:var(--muted); }
+  </style>
+</head>
+<body><div class="wrap">
+  <div class="card">
+    <h1>DeiT + Masked Diffusion Head Handoff for ImageNet-22K</h1>
+    <p><strong>Date:</strong> 2026-05-10</p>
+    <p><strong>Purpose:</strong> give a collaborator enough implementation and configuration detail to faithfully reproduce our current best masked-diffusion classification setup, then adapt it to ImageNet-22K.</p>
+    <p><strong>Current best mature ImageNet-1K pure-diffusion run:</strong> Run N, <code>tiny-bit MLP + K10 multi-mask + low augmentation</code>, ep299 = <strong>63.408%</strong> single-step / <strong>67.480%</strong> iterative. Newer K40/K80/K160 and SiLU runs are still in flight; K80 GELU is now the best mid-epoch K-scaling branch (ep79 58.302/62.476), while K160 GELU is the best early K-scaling read so far (ep19 42.846/49.468), SiLU is mixed, and the full-augmentation mixup/cutmix run has been resumed because early slowness alone does not answer the overfitting/late-growth hypothesis.</p>
+    <p><strong>Hard constraint:</strong> do not warm-start from a CE classifier, do not add an auxiliary CE loss, and do not train or rely on a standard class-logit head. Those are diagnostic shortcuts only and are considered off-target for the masked-diffusion research question.</p>
+  </div>
+
+  <div class="card">
+    <h2>1. Core Idea</h2>
+    <p>Instead of a standard <code>num_classes</code>-way classification logit head, encode each class id as a short binary string and train a masked diffusion / masked bit prediction head.</p>
+    <ul>
+      <li>ImageNet-1K: <code>ceil(log2(1000)) = 10</code> bits.</li>
+      <li>ImageNet-22K with 21,841 classes: <code>ceil(log2(21841)) = 15</code> bits.</li>
+      <li>Input to the diffusion head is a partially-masked bit sequence with tokens <code>0</code>, <code>1</code>, and <code>MASK=2</code>.</li>
+      <li>Loss is bit-wise CE on masked positions only.</li>
+      <li>Eval reports single-step all-mask decode and iterative 4-step decode.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>2. Current Best Architecture</h2>
+    <p>The best pure-diffusion direction is not the attention head. It is a small-bit-embedding, high-capacity CLS-conditioned MLP.</p>
+    <table>
+      <tr><th>Component</th><th>Setting</th></tr>
+      <tr><td>Backbone</td><td>DeiT/ViT-B/16, 224px, 12 layers, 768 dim, 12 heads.</td></tr>
+      <tr><td>Class representation</td><td>LSB-first binary class id, <code>n_bits=10</code> for 1K, <code>n_bits=15</code> for 22K.</td></tr>
+      <tr><td>Head type</td><td><code>MLPDiffusionHead</code>.</td></tr>
+      <tr><td>Bit token embedding</td><td><code>nn.Embed(3, bit_dim=8)</code> plus learned bit position embedding <code>(n_bits, 8)</code>.</td></tr>
+      <tr><td>MLP input</td><td>Concatenate CLS embedding <code>(768)</code> with flattened bit embeddings <code>(n_bits * 8)</code>.</td></tr>
+      <tr><td>MLP capacity</td><td><code>input_proj -> activation -> hidden layer(s) -> activation -> out_proj</code>, hidden dim <code>3072</code>, <code>head_n_layers=2</code>. GELU is the mature Run N setting; REPA-style SiLU/no-LayerNorm is mixed and is not better at K10 or K80 in current matched-epoch reads.</td></tr>
+      <tr><td>Output</td><td><code>(B, n_bits, 2)</code> logits, one binary logit pair per bit.</td></tr>
+      <tr><td>Training masks</td><td><code>K</code> independent masks per image, currently best tested <code>K=10</code>. Encode image once, repeat CLS <code>K</code> times, decode all masked bit views.</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>3. Important Implementation Details</h2>
+    <h3>Bit encoding</h3>
+    <pre><code>def class_to_bits(labels, n_bits):
+    # labels: (B,) int32, returns (B, n_bits), LSB first
+    powers = (2 ** jnp.arange(n_bits)).astype(jnp.int32)
+    return ((labels[:, None] // powers) % 2).astype(jnp.int32)
+
+def bits_to_class(bits):
+    powers = (2 ** jnp.arange(bits.shape[-1])).astype(jnp.int32)
+    return jnp.sum(bits * powers, axis=-1)</code></pre>
+    <h3>Masked diffusion loss</h3>
+    <pre><code>targets = jax.nn.one_hot(bits, 2)                 # (B*K, n_bits, 2)
+per_bit_loss = optax.softmax_cross_entropy(logits, targets)
+loss = (per_bit_loss * bit_mask).sum() / (bit_mask.sum() + 1e-8)</code></pre>
+    <p>This is a token-level mean: every masked bit has equal weight. We have not yet validated sample-level normalization.</p>
+    <h3>K-mask training path</h3>
+    <pre><code># Encode once
+cls = model.encode(images)                         # (B, 768)
+cls = repeat(cls, K, axis=0)                       # (B*K, 768)
+
+# Repeat labels/bits
+bits = repeat(class_to_bits(labels), K, axis=0)    # (B*K, n_bits)
+
+# For every repeated sample, draw t ~ Uniform(0,1), then mask each bit independently
+bit_mask = Bernoulli(t)                            # 1 = masked
+masked_bits = where(bit_mask, MASK=2, bits)
+
+# Decode with MLP head
+logits = model.decode_diffusion_from_cls(cls, masked_bits)
+loss = masked_diffusion_loss(logits, bits, bit_mask)</code></pre>
+    <h3>Mask schedule</h3>
+    <p>Use <code>uniform</code>: sample <code>t ~ U(0,1)</code> per repeated image-mask view, then independently mask each bit with probability <code>t</code>. Logit-normal was worse in earlier attention-head runs.</p>
+    <h3>Eval</h3>
+    <ul>
+      <li>Single-step: all bits masked, one forward pass, argmax every bit.</li>
+      <li>Iterative: 4-step MaskGIT-style confidence unmasking; current eval reports <code>eval_accuracy_iter</code>.</li>
+      <li>For ImageNet-22K, do <strong>not</strong> silently clip invalid codes to the last class in final reporting. Count predicted codes <code>&gt;= num_classes</code> as invalid/wrong and report invalid rate. The 1K code currently clips for historical reasons.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>4. Best ImageNet-1K Config to Reproduce First</h2>
+    <p>This is Run N, the current best pure-from-scratch diffusion setup. For ImageNet-22K, change <code>num_classes</code> and <code>n_bits</code> as described below.</p>
+    <pre><code>model: ViT_base_mdh_mlp
+batch_size: 1024
+learning_rate: 0.0005
+num_epochs: 330
+optimizer: adamw
+adamw_b2: 0.95
+weight_decay: 0.02
+dropout_rate: 0.0
+stochastic_depth_rate: 0.05
+grad_norm_clip: null
+
+use_diffusion_head: true
+head_type: mlp
+head_bit_dim: 8
+head_mlp_hidden_dim: 3072
+head_mlp_activation: gelu
+head_n_layers: 2
+mask_schedule: uniform
+eval_iter_steps: 4
+n_masks_per_image: 10
+
+dataset:
+  use_mixup_cutmix: false
+  use_rand_augment: false
+  reprob: 0.0
+  repeated_aug: 1
+  label_smoothing: 0.1   # mostly irrelevant for pure diffusion because labels are argmaxed
+  num_tpus: 8</code></pre>
+    <p><strong>Why no mixup/cutmix by default:</strong> the original bug was mixed images supervised by only an <code>argmax</code> hard class. We also implemented the corrected K-view allocation (<code>soft_top2</code>: split the K repeated diffusion targets across the two mixed labels, e.g. K10 50/50 becomes 5+5). The corrected full-augmentation run was extremely slow at ep19, but it has been resumed and should be kept to ep39/59 before making a final statement about late generalization. For the collaborator's first 22K reproduction, use no mixup/cutmix; treat full-augmentation <code>soft_top2</code> as a follow-up ablation.</p>
+    <p><strong>No “投敌” / no CE shortcut:</strong> this reproduction should train the backbone and diffusion head from scratch under the masked-bit objective. Do not load a CE-pretrained DeiT checkpoint, do not set <code>load_backbone_from</code>, do not enable <code>head_aux_ce</code>, and do not add an auxiliary <code>num_classes</code>-way CE loss. Run I and Run H below are diagnostics only and should not be copied as the main recipe.</p>
+  </div>
+
+  <div class="card">
+    <h2>5. Changes Required for ImageNet-22K</h2>
+    <ul>
+      <li>Set <code>NUM_CLASSES = 21841</code> or your exact class count.</li>
+      <li>Set <code>n_bits = ceil(log2(NUM_CLASSES))</code>; for 21,841 classes this is <code>15</code>.</li>
+      <li>Make sure <code>ViT(..., num_classes=NUM_CLASSES, n_bits=15)</code>.</li>
+      <li>Parameterize all hardcoded <code>1000</code>, <code>NUM_CLASSES=1000</code>, and <code>NUM_BITS=10</code> constants.</li>
+      <li>In eval, track <code>invalid_rate = mean(pred_class &gt;= NUM_CLASSES)</code>. For 22K, 15 bits gives 32,768 possible codes, so the invalid-code space is large: <code>32768 - 21841 = 10927</code> invalid codes, about 33.3% of the bit code space.</li>
+      <li>Training labels are always valid, so invalid codes are mainly an inference/eval issue.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>6. Experimental Evidence So Far</h2>
+    <table>
+      <tr><th>Run</th><th>Design</th><th>Key result</th><th>Conclusion</th></tr>
+      <tr><td>M</td><td>Tiny-bit MLP + K10 + normal DeiT aug/regularization, no mixup/cutmix</td><td>ep159 54.266% / iter 58.480%</td><td>Normal augmentation is worse than low augmentation.</td></tr>
+      <tr><td>N</td><td>Tiny-bit MLP + K10 + low aug/regularization, GELU</td><td>ep299 63.408% / iter 67.480%</td><td>Best mature pure-diffusion baseline; still improving slowly.</td></tr>
+      <tr><td>P</td><td>Tiny-bit MLP + K40 + low aug/regularization, GELU</td><td>ep79 57.226% / iter 61.538%</td><td>K40 front-loads learning, but its matched-epoch margin over K10 shrinks later.</td></tr>
+      <tr><td>Q</td><td>Tiny-bit MLP + K40 + aggressive low-reg, wd0/sd0</td><td>ep59 54.176% / iter 58.888%</td><td>Dominated by P and slightly behind N at matched ep59; stopped.</td></tr>
+      <tr><td>R</td><td>REPA-style SiLU/no-LN MLP + K40 + low aug/regularization</td><td>ep99 59.146% / iter 62.334%</td><td>Still improving, but below mature N; SiLU is not decisive.</td></tr>
+      <tr><td>S</td><td>K10 + full baseline augmentation + corrected <code>soft_top2</code> mixup/cutmix label allocation</td><td>ep19 2.364% / iter 5.054%; resumed from <code>checkpoint_25020</code>, training at ep20.6</td><td>Very slow early convergence, but keep to ep39/59 to test the user's late-generalization hypothesis.</td></tr>
+      <tr><td>T</td><td>K80 + low aug/regularization, GELU</td><td>ep79 58.302% / iter 62.476%</td><td>Best mid-epoch K-scaling branch so far; beats K40 P/R at ep79.</td></tr>
+      <tr><td>U</td><td>K80 + low aug/regularization, SiLU</td><td>ep59 56.480% / iter 60.426%</td><td>Below T/K80 GELU at matched ep59, especially iterative accuracy.</td></tr>
+      <tr><td>V</td><td>K10 + low aug/regularization, SiLU</td><td>ep59 55.462% / iter 59.876%</td><td>Recovered by ep59 and slightly beats N/GELU at matched early checkpoint; needs later checkpoints.</td></tr>
+      <tr><td>W</td><td>K160 + low aug/regularization, GELU</td><td>ep19 42.846% / iter 49.468%</td><td>Best early K-scaling read so far; keep to ep39.</td></tr>
+      <tr><td>I</td><td>Warm-start CE backbone + diffusion head</td><td>ep159 61.020% / iter 63.754%</td><td>Diagnostic only. Do not use for the ImageNet-22K reproduction because it warm-starts from CE.</td></tr>
+      <tr><td>H</td><td>Attention head + auxiliary CE loss</td><td>ep159 53.206% / iter 55.122% before failure</td><td>Diagnostic only. Do not use because the auxiliary CE loss changes the research question.</td></tr>
+      <tr><td>L</td><td>Cross-attention to full patch tokens + K10</td><td>ep99 51.808% / iter 58.396%</td><td>Learns, but trails Run N at the same epoch.</td></tr>
+      <tr><td>E</td><td>Old attention head, K1, zero-init final projection</td><td>ep159 2.384% / iter 4.706%</td><td>Failed/too slow.</td></tr>
+      <tr><td>G</td><td>Old larger attention head, K1, 512 dim, 4 layers, 8 heads</td><td>ep159 4.614% / iter 9.764%</td><td>Bigger old attention head did not fix supervision bottleneck.</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>7. Why E and G Were So Low</h2>
+    <p>E/G are not the successful K10 MLP architecture. They are older attention-head experiments with <code>n_masks_per_image=1</code> and full DeiT augmentation/regularization.</p>
+    <ul>
+      <li><strong>E:</strong> <code>ViT_base_mdh_zero_init</code>, old CLS+bit-token attention head, <code>inner_dim=256</code>, <code>2 layers</code>, <code>4 heads</code>, final bit projection zero-initialized.</li>
+      <li><strong>G:</strong> <code>ViT_base_mdh_large</code>, old CLS+bit-token attention head, <code>inner_dim=512</code>, <code>4 layers</code>, <code>8 heads</code>.</li>
+      <li>Both used <code>K=1</code>, so each image gives only one random mask supervision view per step.</li>
+      <li>Both used stronger augmentation/regularization: RandAugment on, reprob 0.25, repeated_aug 3, weight_decay 0.05, stochastic_depth 0.1.</li>
+      <li>E's zero-initialized output projection likely made early learning especially slow: all bit logits start symmetric and the model has to break out from weak masked-bit gradients.</li>
+      <li>The old attention head spent capacity modeling interactions among 10 bit tokens. The successful MLP instead uses CLS semantics directly with a high-capacity 3072-d decoder and very cheap bit conditioning.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>8. K Scaling and Memory Estimate</h2>
+    <p>K-mask training reuses the ViT backbone output. Increasing K mainly scales the small MLP diffusion head, not the ViT backbone.</p>
+    <p>For ImageNet-22K with <code>n_bits=15</code>, MLP input dim is <code>768 + 15*8 = 888</code>, hidden dim is 3072. Rough global activation footprint for the head only:</p>
+    <table>
+      <tr><th>K</th><th>Rough global head activations</th><th>Rough per-device / 8 TPU devices</th></tr>
+      <tr><td>10</td><td>~276 MiB</td><td>~35 MiB</td></tr>
+      <tr><td>20</td><td>~552 MiB</td><td>~69 MiB</td></tr>
+      <tr><td>40</td><td>~1.10 GiB</td><td>~138 MiB</td></tr>
+      <tr><td>80</td><td>~2.21 GiB</td><td>~276 MiB</td></tr>
+    </table>
+    <p>This is a rough lower bound before XLA/backward buffers, but it supports trying <strong>K=40 first</strong>. If stable, try <strong>K=80</strong>. For 1K, numbers are almost identical because 10 vs 15 bits barely changes the MLP size.</p>
+  </div>
+
+  <div class="card">
+    <h2>9. Recommended ImageNet-22K First Runs</h2>
+    <p>All recommended runs below are pure masked-diffusion runs from scratch. They must not use CE warm-starting, auxiliary CE loss, or a standard classification head as training supervision.</p>
+    <table>
+      <tr><th>Priority</th><th>Config</th><th>Purpose</th></tr>
+      <tr><td>P0</td><td>Run N equivalent: MLP, K10, low aug, wd0.02, sd0.05, GELU, 15 bits</td><td>Faithful reproduction of the best mature no-shortcut recipe.</td></tr>
+      <tr><td>P1</td><td>K40 + low aug + SiLU/no-LayerNorm MLP</td><td>Useful variant: SiLU beats GELU at K40 ep19/ep39, though the advantage shrinks by ep59.</td></tr>
+      <tr><td>P1</td><td>K80 + low aug, compare GELU and SiLU/no-LayerNorm</td><td>Memory-feasible; K80 GELU reaches ep79 <code>58.302%</code> / iter <code>62.476%</code>, better than K40 P/R at matched ep79.</td></tr>
+      <tr><td>P1</td><td>K160 + low aug + GELU</td><td>Promising scaling run; ImageNet-1K ep19 reached <code>42.846%</code> / iter <code>49.468%</code>, best early K-scaling result so far.</td></tr>
+      <tr><td>Follow-up only</td><td>Full baseline augmentation with mixup/cutmix</td><td>Corrected <code>soft_top2</code> implementation was very slow at ep19, but has been resumed to test late growth. Do not use as the first 22K recipe.</td></tr>
+      <tr><td>P2</td><td>Eval-only: more iterative steps / majority vote</td><td>Boost final accuracy without changing training.</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>10. Minimal Porting Checklist</h2>
+    <ul>
+      <li>Keep the run pure: <code>load_backbone_from=''</code>, <code>head_aux_ce=false</code>, no auxiliary CE loss, no standard class-logit training objective.</li>
+      <li>Port <code>MLPDiffusionHead</code>.</li>
+      <li>Port <code>class_to_bits</code>, <code>bits_to_class</code>, <code>masked_diffusion_loss</code>.</li>
+      <li>Implement <code>encode once -> repeat CLS K times -> decode K masked bit views</code>.</li>
+      <li>Default recommendation: disable mixup/cutmix for the first 22K reproduction. If re-enabling it for research, do not argmax mixed labels; use K-view label allocation such as <code>diffusion_label_mode=soft_top2</code>, where the K repeated masked-bit targets are split across the top-2 soft-label classes in proportion to their weights. The corrected full-augmentation run is currently resumed; wait for ep39/59 before using it to make a late-growth claim.</li>
+      <li>Use low augmentation: no RandAugment, no random erasing, repeated_aug=1.</li>
+      <li>Start with <code>adamw_b2=0.95</code>, <code>lr=5e-4 * batch_size/512</code>, <code>batch_size=1024</code> if resources match.</li>
+      <li>Log: single-step acc, iterative acc, eval loss, invalid code rate, train loss, train exact-bit-sequence accuracy.</li>
+      <li>For ImageNet-22K, invalid code handling must be explicit because 15-bit code space has many invalid ids.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>11. Local Follow-up After This Report</h2>
+    <ul>
+      <li>Low-ROI ImageNet-1K runs E and G were stopped to free TPU slots.</li>
+      <li>Run P was launched locally: ImageNet-1K, tiny-bit MLP, K40, low-aug mild, <code>weight_decay=0.02</code>, <code>stochastic_depth_rate=0.05</code>.</li>
+      <li>Run Q was launched locally: ImageNet-1K, tiny-bit MLP, K40, low-aug aggressive, <code>weight_decay=0.0</code>, <code>stochastic_depth_rate=0.0</code>.</li>
+      <li>At launch time, Runs P and Q had both reached first batch / initial compilation, so K40 did not fail immediately from parameter setup or data loading.</li>
+      <li>After ep19, K40 looks promising: Run P reached <code>41.366%</code> / iter <code>47.526%</code>; Run Q reached <code>41.540%</code> / iter <code>47.992%</code>. Both beat the K10 low-aug Run N ep19 result of <code>38.328%</code> / iter <code>44.502%</code>.</li>
+      <li>After ep39, Run P is the stronger K40 branch: <code>51.626%</code> / iter <code>56.988%</code>, versus Run Q <code>50.968%</code> / iter <code>56.540%</code>. K40 still beats Run N K10 at ep39 (<code>49.738%</code> / iter <code>55.010%</code>), but the margin shrank, so keep monitoring before calling K40 the final best recipe.</li>
+      <li>After ep59, Run P stayed slightly ahead of matched K10: <code>55.920%</code> / iter <code>60.550%</code>, versus Run N ep59 <code>54.634%</code> / iter <code>59.000%</code>. Run Q fell behind both at <code>54.176%</code> / iter <code>58.888%</code>, so aggressive <code>wd=0, sd=0</code> is not recommended.</li>
+      <li>After ep79, Run P's K40 GELU advantage over K10 GELU had nearly disappeared: P reached <code>57.226%</code> / iter <code>61.538%</code>, versus Run N ep79 <code>56.896%</code> / iter <code>60.954%</code>. P was stopped to test K10 SiLU.</li>
+      <li>Run R tests the REPA-inspired no-LayerNorm SiLU MLP activation at K40. It beat GELU at ep19 (<code>42.032%</code> / iter <code>48.254%</code>) and ep39 (<code>53.514%</code> / iter <code>58.272%</code>, versus P/GELU ep39 <code>51.626%</code> / iter <code>56.988%</code>). At ep79 it reached <code>57.624%</code> / iter <code>61.282%</code>, slightly above P/GELU single-step but slightly below P/GELU iterative accuracy.</li>
+      <li>Run S tested full baseline augmentation with corrected diffusion mixup/cutmix labels: K10, full RandAugment/random-erasing/repeated-aug/mixup/cutmix, and <code>soft_top2</code> K-view target allocation. It was initially stopped after ep19 <code>2.364%</code> / iter <code>5.054%</code>, but that was too aggressive for the intended overfitting/late-growth test. It has been resumed from <code>checkpoint_25020</code> on window <code>6427</code> and should be kept to ep39/59.</li>
+      <li>Run T was launched after stopping dominated Run Q: K80, low-aug mild, otherwise same as Run P. It reached ep59 at <code>56.584%</code> / iter <code>61.278%</code>, now better than R/K40 SiLU at matched ep59.</li>
+      <li>Run U was launched as K80 + REPA-style SiLU + low-aug mild. It reached ep59 at <code>56.480%</code> / iter <code>60.426%</code>, below T/K80 GELU ep59 <code>56.584%</code> / iter <code>61.278%</code>; SiLU does not help at K80.</li>
+      <li>Run V was launched after stopping P: K10 + REPA-style SiLU + low-aug mild. It isolates the activation change against Run N; ep59 was <code>55.462%</code> / iter <code>59.876%</code>, slightly above Run N/GELU at matched ep59 after trailing at ep19/39. Keep for later checkpoints.</li>
+      <li>Run W was launched after stopping low-ROI cross-attention Run L: K160 + GELU + low-aug mild. It reached ep19 at <code>42.846%</code> / iter <code>49.468%</code>, the best early K-scaling read so far; keep it to ep39.</li>
+      <li>Latest S correction: Run S is now running at window <code>6427</code> on <code>1dqe89</code>; ep39 reached <code>11.834%</code> / iter <code>17.946%</code>. It must not be stopped for slow early full-augmentation convergence; keep it at least to ep59 before judging late-growth/generalization.</li>
+      <li>Run U was retired after ep79/84 because it was dominated by Run T at K80; this freed <code>j3rqvs</code> and did not affect S.</li>
+      <li>Run X was launched: K320 + GELU + low-aug mild, no warm-start, no aux CE, no CE shortcut. It started successfully on window <code>6429</code> with logdir <code>/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_050959_acnfxy_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval</code>; first train log was ep <code>0.079</code>, loss <code>0.69315</code>, so K320 did not immediately OOM.</li>
+      <li>Run N finished; latest mature eval is ep319 <code>63.604%</code> / iter <code>67.726%</code>. This remains the best completed pure diffusion baseline.</li>
+      <li>Run T reached ep99 <code>59.146%</code> / iter <code>63.188%</code>, improving iterative accuracy over R/K40 SiLU at matched ep99.</li>
+      <li>Run V reached ep79 <code>57.348%</code> / iter <code>61.210%</code>; K10 SiLU is not clearly better than GELU by this point.</li>
+      <li>Run Y was launched after N finished: K640 + GELU + low-aug mild, no warm-start, no aux CE, no CE shortcut. It started successfully on window <code>6430</code>, logdir <code>/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_061640_ak1rkw_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval</code>; first train steps reached ep <code>0.319</code> without OOM.</li>
+      <li>Run S reached ep59 <code>30.338%</code> / iter <code>37.420%</code>. This confirms delayed full-augmentation convergence, but it remains far below the low-aug recipe at matched epoch; keep to ep79 as a late-growth diagnostic, not as the current best 22K recommendation.</li>
+      <li>Run W K160 reached ep59 <code>56.710%</code> / iter <code>61.160%</code>, roughly tied with T/K80 ep59 and not a clear K160 win. Run X K320 ep19 <code>42.706%</code> / iter <code>48.984%</code> is slightly below W/K160 ep19, so high-K scaling is not yet monotonic.</li>
+      <li>Run T reached ep119 <code>59.774%</code> / iter <code>63.574%</code>, now better than R/K40 SiLU at matched ep119 on iterative accuracy. Run V/K10 SiLU reached ep99 <code>58.030%</code> / iter <code>61.646%</code> and was stopped as low priority.</li>
+      <li>Run Z was launched after stopping V: K80 + full baseline augmentation + corrected <code>soft_top2</code> mixup/cutmix, no warm-start, no aux CE. It started successfully on window <code>6431</code>; first train steps reached ep <code>0.159</code> without OOM. Z tests whether higher K can rescue the slow S/K10 full-augmentation branch.</li>
+    </ul>
+  </div>
+</div></body></html>

@@ -13,6 +13,8 @@ from functools import partial
 import zhh.F as F
 import zhh.random as zr
 
+GELU = partial(nn.gelu, approximate=False)
+
 def special_linear(features,use_bias=True):
     return nn.Dense(features, kernel_init=nn.initializers.truncated_normal(0.02), bias_init=nn.initializers.zeros, use_bias=use_bias)
 
@@ -66,7 +68,7 @@ class Layer(nn.Module):
         self.ln1 = nn.LayerNorm(use_bias=self.use_ln_bias, use_scale=True, scale_init=nn.initializers.ones)
         self.mlp = nn.Sequential([
             special_linear(self.linear_dim),
-            nn.gelu,
+            GELU,
             special_linear(self.dim)
         ])
         self.ln2 = nn.LayerNorm(use_bias=self.use_ln_bias, use_scale=True, scale_init=nn.initializers.ones)
@@ -125,7 +127,7 @@ class DiffusionLayer(nn.Module):
         self.ln2 = nn.LayerNorm(use_bias=True)
         self.mlp = nn.Sequential([
             special_linear(self.dim * 4),
-            nn.gelu,
+            GELU,
             special_linear(self.dim),
         ])
 
@@ -136,41 +138,60 @@ class DiffusionLayer(nn.Module):
         return x
 
 
+class CrossAttentionDiffusionLayer(nn.Module):
+    """Bit-query block: self-attn + cross-attn to image tokens + MLP."""
+    n_heads: int
+    dim: int
+
+    def setup(self):
+        self.ln_q_self = nn.LayerNorm(use_bias=True)
+        self.self_attn = Attention(head=self.n_heads, dim=self.dim, attn_dim=self.dim, use_bias=True)
+        self.ln_q_cross = nn.LayerNorm(use_bias=True)
+        self.cross_attn = Attention(head=self.n_heads, dim=self.dim, attn_dim=self.dim, use_bias=True)
+        self.ln_q_mlp = nn.LayerNorm(use_bias=True)
+        self.mlp = nn.Sequential([
+            special_linear(self.dim * 4),
+            GELU,
+            special_linear(self.dim),
+        ])
+
+    def __call__(self, q, mem):
+        q = q + self.self_attn(self.ln_q_self(q), self.ln_q_self(q))
+        q = q + self.cross_attn(self.ln_q_cross(q), mem)
+        q = q + self.mlp(self.ln_q_mlp(q))
+        return q
+
+
 class MaskedDiffusionHead(nn.Module):
     """
-    Masked diffusion head for classification.
-    Encodes label as n_bits binary, learns masked prediction via a small transformer.
-    Tokens: 0 = bit-0, 1 = bit-1, 2 = MASK.
+    Cross-attention diffusion head:
+    bit queries attend to full image tokens (CLS + patches).
     """
     n_bits: int = NUM_BITS
-    embed_dim: int = 768   # backbone CLS dim
-    inner_dim: int = 256   # internal width
-    n_layers: int = 2      # number of DiffusionLayer blocks (0 = no inter-bit attention)
+    embed_dim: int = 768
+    n_layers: int = 4
     n_heads: int = 4
     zero_init_proj: bool = False  # zero-init out_proj kernel for training stability
 
     def setup(self):
-        self.cls_proj = special_linear(self.inner_dim)
-        self.bit_emb = nn.Embed(3, self.inner_dim)  # tokens: 0, 1, MASK=2
+        self.bit_emb = nn.Embed(3, self.embed_dim)  # tokens: 0, 1, MASK=2
         self.bit_pos = self.param('bit_pos', nn.initializers.truncated_normal(0.02),
-                                  (self.n_bits, self.inner_dim))
-        self.diff_layers = [DiffusionLayer(n_heads=self.n_heads, dim=self.inner_dim)
+                                  (self.n_bits, self.embed_dim))
+        self.diff_layers = [CrossAttentionDiffusionLayer(n_heads=self.n_heads, dim=self.embed_dim)
                             for _ in range(self.n_layers)]
         proj_kernel_init = nn.initializers.zeros if self.zero_init_proj else nn.initializers.truncated_normal(0.02)
         self.out_proj = nn.Dense(2, kernel_init=proj_kernel_init, bias_init=nn.initializers.zeros, use_bias=True)
 
-    def __call__(self, cls_token, masked_bits):
+    def __call__(self, image_tokens, masked_bits):
         """
-        cls_token:   (B, embed_dim)
+        image_tokens: (B, T, embed_dim), T=1+num_patches
         masked_bits: (B, n_bits)  values in {0, 1, 2}
         Returns:     (B, n_bits, 2) logits
         """
-        cls = self.cls_proj(cls_token)[:, None, :]              # (B, 1, inner_dim)
-        bits = self.bit_emb(masked_bits) + self.bit_pos         # (B, n_bits, inner_dim)
-        x = jnp.concatenate([cls, bits], axis=1)                # (B, 1+n_bits, inner_dim)
+        x = self.bit_emb(masked_bits) + self.bit_pos            # (B, n_bits, embed_dim)
         for layer in self.diff_layers:
-            x = layer(x)
-        return self.out_proj(x[:, 1:, :])                       # (B, n_bits, 2)
+            x = layer(x, image_tokens)
+        return self.out_proj(x)                                 # (B, n_bits, 2)
 
 
 class MLPDiffusionHead(nn.Module):
@@ -182,19 +203,32 @@ class MLPDiffusionHead(nn.Module):
     """
     n_bits: int = NUM_BITS
     embed_dim: int = 768
-    inner_dim: int = 256
+    bit_dim: int = 8
+    hidden_dim: int = 3072
     n_layers: int = 2   # number of hidden MLP layers
+    activation: str = 'gelu'
+    use_layer_norm: bool = False
     zero_init_proj: bool = False  # zero-init out_proj kernel for training stability
 
     def setup(self):
-        self.cls_proj = special_linear(self.inner_dim)
-        self.bit_emb = nn.Embed(3, self.inner_dim)           # tokens: 0, 1, MASK=2
+        self.bit_emb = nn.Embed(3, self.bit_dim)             # tokens: 0, 1, MASK=2
         self.bit_pos = self.param('bit_pos', nn.initializers.truncated_normal(0.02),
-                                  (self.n_bits, self.inner_dim))
-        hidden_dim = self.inner_dim * 4                      # 256*4=1024
-        self.hidden_layers = [special_linear(hidden_dim) for _ in range(self.n_layers)]
+                                  (self.n_bits, self.bit_dim))
+        self.input_proj = special_linear(self.hidden_dim)
+        self.hidden_layers = [special_linear(self.hidden_dim) for _ in range(max(self.n_layers - 1, 0))]
+        if self.use_layer_norm:
+            self.mlp_lns = [
+                nn.LayerNorm(use_scale=True, use_bias=True, scale_init=nn.initializers.ones)
+                for _ in range(self.n_layers)
+            ]
         proj_kernel_init = nn.initializers.zeros if self.zero_init_proj else nn.initializers.truncated_normal(0.02)
         self.out_proj = nn.Dense(self.n_bits * 2, kernel_init=proj_kernel_init, bias_init=nn.initializers.zeros, use_bias=True)
+        if self.activation == 'silu':
+            self.act = nn.silu
+        elif self.activation == 'gelu':
+            self.act = GELU
+        else:
+            raise ValueError(f'Unsupported MLPDiffusionHead activation: {self.activation}')
 
     def __call__(self, cls_token, masked_bits):
         """
@@ -202,12 +236,18 @@ class MLPDiffusionHead(nn.Module):
         masked_bits: (B, n_bits)  values in {0, 1, 2}
         Returns:     (B, n_bits, 2) logits
         """
-        cls = self.cls_proj(cls_token)                       # (B, inner_dim)
-        bits = self.bit_emb(masked_bits) + self.bit_pos      # (B, n_bits, inner_dim)
-        bits_flat = bits.reshape(bits.shape[0], -1)          # (B, n_bits*inner_dim)
-        x = jnp.concatenate([cls, bits_flat], axis=-1)       # (B, (n_bits+1)*inner_dim)
-        for fc in self.hidden_layers:
-            x = nn.gelu(fc(x))
+        bits = self.bit_emb(masked_bits) + self.bit_pos      # (B, n_bits, bit_dim)
+        bits_flat = bits.reshape(bits.shape[0], -1)          # (B, n_bits*bit_dim)
+        x = jnp.concatenate([cls_token, bits_flat], axis=-1) # (B, embed_dim + n_bits*bit_dim)
+        x = self.input_proj(x)
+        if self.use_layer_norm:
+            x = self.mlp_lns[0](x)
+        x = self.act(x)
+        for i, fc in enumerate(self.hidden_layers, start=1):
+            x = fc(x)
+            if self.use_layer_norm:
+                x = self.mlp_lns[i](x)
+            x = self.act(x)
         x = self.out_proj(x)                                 # (B, n_bits*2)
         return x.reshape(x.shape[0], self.n_bits, 2)         # (B, n_bits, 2)
 
@@ -233,6 +273,10 @@ class ViT(nn.Module):
     use_diffusion_head: bool = False
     n_bits: int = 10
     head_inner_dim: int = 256
+    head_bit_dim: int = 8
+    head_mlp_hidden_dim: int = 3072
+    head_mlp_activation: str = 'gelu'
+    head_mlp_layer_norm: bool = False
     head_n_layers: int = 2
     head_n_heads: int = 4
     head_type: str = 'attention'   # 'attention' | 'mlp'
@@ -271,8 +315,11 @@ class ViT(nn.Module):
             self.diffusion_head = MLPDiffusionHead(
                 n_bits=self.n_bits,
                 embed_dim=embed_dim,
-                inner_dim=self.head_inner_dim,
+                bit_dim=self.head_bit_dim,
+                hidden_dim=self.head_mlp_hidden_dim,
                 n_layers=self.head_n_layers,
+                activation=self.head_mlp_activation,
+                use_layer_norm=self.head_mlp_layer_norm,
                 zero_init_proj=self.head_zero_init_proj,
             )
             if self.head_aux_ce:
@@ -281,7 +328,6 @@ class ViT(nn.Module):
             self.diffusion_head = MaskedDiffusionHead(
                 n_bits=self.n_bits,
                 embed_dim=embed_dim,
-                inner_dim=self.head_inner_dim,
                 n_layers=self.head_n_layers,
                 n_heads=self.head_n_heads,
                 zero_init_proj=self.head_zero_init_proj,
@@ -291,6 +337,10 @@ class ViT(nn.Module):
 
     def encode(self, x: jnp.ndarray, rng, train=True):
         """Return CLS token embedding (before head)."""
+        return self.encode_tokens(x, rng, train)[:, 0]
+
+    def encode_tokens(self, x: jnp.ndarray, rng, train=True):
+        """Return all token embeddings (CLS + patches) after final LN."""
         p = self.patch_size
         x = F.patchify(x, patch_size=p)
         embed = self.embedding(x)
@@ -299,22 +349,40 @@ class ViT(nn.Module):
         x = F.dropout(x, rate=self.dropout_rate, training=train, rng=rng); rng = zr.next(rng)
         for ly in self.layers:
             x = ly(x, rng=rng, training=train); rng = zr.next(rng)
-        return self.final_ln(x[:, 0])  # (B, embed_dim)
+        return self.final_ln(x)  # (B, 1+num_patches, embed_dim)
+
+    def decode_diffusion_from_cls(self, cls: jnp.ndarray, masked_bits=None, return_aux_ce=False):
+        """Decode bit logits from precomputed CLS embeddings."""
+        if masked_bits is None:
+            masked_bits = jnp.full((cls.shape[0], self.n_bits), 2)
+        diff_logits = self.diffusion_head(cls, masked_bits)
+        if self.head_aux_ce:
+            ce_logits = self.fc(cls)  # keep consistent with __call__
+            if return_aux_ce:
+                return diff_logits, ce_logits
+        return diff_logits
+
+    def decode_diffusion_from_tokens(self, tokens: jnp.ndarray, masked_bits=None, return_aux_ce=False):
+        """Decode bit logits from precomputed token memory via cross-attention."""
+        if masked_bits is None:
+            masked_bits = jnp.full((tokens.shape[0], self.n_bits), 2)
+        diff_logits = self.diffusion_head(tokens, masked_bits)
+        if self.head_aux_ce:
+            ce_logits = self.fc(tokens[:, 0])  # aux CE uses CLS token
+            if return_aux_ce:
+                return diff_logits, ce_logits
+        return diff_logits
 
     def __call__(self, x:jnp.ndarray, rng, train=True, masked_bits=None, return_aux_ce=False):
         # x.shape: [B, H, W, C]
-        cls = self.encode(x, rng, train)
         if not self.use_diffusion_head:
+            cls = self.encode(x, rng, train)
             return self.fc(cls)
-        else:
-            if masked_bits is None:
-                masked_bits = jnp.full((x.shape[0], self.n_bits), 2)
-            diff_logits = self.diffusion_head(cls, masked_bits)
-            if self.head_aux_ce:
-                ce_logits = self.fc(cls)  # always call so params are initialized
-                if return_aux_ce:
-                    return diff_logits, ce_logits
-            return diff_logits
+        if self.head_type == 'mlp':
+            cls = self.encode(x, rng, train)
+            return self.decode_diffusion_from_cls(cls, masked_bits=masked_bits, return_aux_ce=return_aux_ce)
+        tokens = self.encode_tokens(x, rng, train)
+        return self.decode_diffusion_from_tokens(tokens, masked_bits=masked_bits, return_aux_ce=return_aux_ce)
 
 ViT_base = partial(
     ViT,

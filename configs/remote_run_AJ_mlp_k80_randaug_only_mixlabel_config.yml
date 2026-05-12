@@ -1,6 +1,6 @@
-# Phase 2 Run AK: tiny-bit MLP K80 + RandAugment + random erasing medium augmentation + corrected mixup/cutmix soft_top2
-# Purpose: extend AJ by adding random erasing, while still avoiding repeated_aug=3 and stronger WD/SD.
-# This isolates whether RA/reprob image augmentation can help late generalization without full-aug's severe slow convergence.
+# Phase 2 Run AJ: tiny-bit MLP K80 + RandAugment-only medium augmentation + corrected mixup/cutmix soft_top2
+# Purpose: test whether adding back only RandAugment to the AB best config improves late generalization
+# without the severe slow convergence of full baseline augmentation (RA + reprob + repeated_aug + stronger WD/SD).
 # No warm-start, no aux CE, no CE shortcut.
 
 model: ViT_base_mdh_mlp
@@ -13,7 +13,7 @@ dataset:
 
     use_rand_augment: true
     rand_augment: rand-m9-mstd0.5-inc1
-    reprob: 0.25
+    reprob: 0.0
 
     use_mixup_cutmix: true
     mixup_prob: 1.0
@@ -55,14 +55,14 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
-    wandb_notes: 'deit phase2 Run AK: MLP K80 RandAug+reprob + corrected mixup/cutmix soft_top2; no CE shortcut'
+    wandb_notes: 'deit phase2 Run AJ: MLP K80 RandAug-only + corrected mixup/cutmix soft_top2; no CE shortcut'
     wandb_tags:
         - sqa
         - phase2
         - mlp-head
         - tiny-bit
         - k80
-        - randaug-reprob
+        - randaug-only
         - medium-aug
         - mixup-cutmix-soft-top2
         - no-ce-shortcut

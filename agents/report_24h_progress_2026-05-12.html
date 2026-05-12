@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeiT Masked Diffusion Head 24h Progress Report</title>
+  <style>
+    :root {
+      --bg: #f3efe4;
+      --card: #fffdf7;
+      --ink: #1f2520;
+      --muted: #677066;
+      --line: #d9cdb8;
+      --accent: #0f766e;
+      --accent2: #7c4a03;
+      --good: #166534;
+      --warn: #a16207;
+      --bad: #9f1239;
+      --code: #ede4d4;
+    }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0 0, rgba(15,118,110,.16), transparent 32rem),
+        radial-gradient(circle at 100% 10%, rgba(124,74,3,.13), transparent 28rem),
+        linear-gradient(135deg, #f7f1e4, #edf6f1 60%, #f8f3e8);
+      font-family: "Aptos", "Source Han Sans SC", "PingFang SC", sans-serif;
+      line-height: 1.55;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 34px 18px 64px; }
+    .hero, .card {
+      background: rgba(255,253,247,.95);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(62,48,26,.08);
+    }
+    .hero { padding: 24px 28px; margin-bottom: 16px; }
+    .card { padding: 18px 22px; margin: 14px 0; }
+    h1 { font-size: 34px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -.02em; }
+    h2 { font-size: 21px; color: var(--accent); margin: 0 0 10px; }
+    h3 { font-size: 16px; color: var(--accent2); margin: 16px 0 8px; }
+    p { margin: 8px 0; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    th, td { border: 1px solid var(--line); padding: 8px 9px; text-align: left; vertical-align: top; }
+    th { background: #efe6d6; }
+    code { background: var(--code); border: 1px solid #ddcfb8; border-radius: 6px; padding: 1px 5px; font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+    pre { background: #202017; color: #fbf6e9; padding: 14px; border-radius: 12px; overflow: auto; font-size: 12px; }
+    .good { color: var(--good); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .muted { color: var(--muted); }
+    .pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; margin: 2px 4px 2px 0; background: #f5eddd; font-size: 12px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <h1>DeiT Masked Diffusion Head: 24h Progress Report</h1>
+    <p><strong>Time window:</strong> approximately 2026-05-11 14:00 UTC to 2026-05-12 14:05 UTC.</p>
+    <p><strong>Core outcome:</strong> the best pure masked-diffusion DeiT run is now <span class="good">Run AB, K80 low-augmentation + corrected mixup/cutmix labels</span>, reaching <strong>76.600%</strong> single-step and <strong>78.294%</strong> iterative accuracy at epoch 319. This is the first clearly strong, mature, no-CE-shortcut configuration.</p>
+    <p><span class="pill">No warm-start</span><span class="pill">No <code>load_backbone_from</code></span><span class="pill">No auxiliary CE</span><span class="pill">No CE head shortcut</span></p>
+  </section>
+
+  <section class="card">
+    <h2>1. Executive Summary</h2>
+    <ul>
+      <li><strong>Best result moved substantially:</strong> AB improved from the first useful 24h-window read at ep59 <code>64.890 / 68.616</code> to ep319 <code>76.600 / 78.294</code>. The iterative decoder adds about <code>+1.69</code> points at the final useful eval.</li>
+      <li><strong>Current best recipe is AB:</strong> <code>ViT_base_mdh_mlp</code>, <code>K=80</code>, low augmentation, corrected <code>soft_top2</code> mixup/cutmix target allocation, GELU MLP head, AdamW <code>b2=0.95</code>, WD <code>0.02</code>, stochastic depth <code>0.05</code>.</li>
+      <li><strong>Full augmentation is not dead, but it is still far behind:</strong> Z K80 full-augmentation reached ep139 <code>62.192 / 66.086</code>, while AB at matched ep139 was <code>72.550 / 74.542</code>. S K10 full-augmentation finished with ep319 <code>69.324 / 72.296</code>.</li>
+      <li><strong>CutMix-heavy variants are useful but not yet better than mature AB:</strong> AH p=0.75 reached ep239 <code>75.364 / 77.016</code>, essentially tied with matched AB ep239 <code>75.504 / 76.992</code>, but below mature AB ep319.</li>
+      <li><strong>The p=0.625 interpolation is not an early win:</strong> AI reached ep59 <code>63.920 / 67.830</code>, below AB, AH, and AF at matched ep59. Keep to ep79 only because it is healthy and already running.</li>
+      <li><strong>Sanity reproduction improved but is not closed:</strong> CE sanity v2/no-LayerScale failed to reproduce. CF, using <code>ViT_base_v3</code> plus current reference-alignment fixes, reached ep79 <code>55.926%</code>, clearly alive but still below the old v3 sanity trajectory.</li>
+      <li><strong>Infrastructure issues were handled:</strong> duplicate <code>config.load_from</code> resume failures were diagnosed; Z and AI were manually resumed correctly from their own checkpoints. Stale failed auto-reruns were ignored. Forbidden aux-CE Run H/6459 has not been resumed as an active branch.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>2. Current Best Configuration</h2>
+    <p>If a collaborator with ImageNet-22K wants one configuration to follow today, use AB as the base recipe, then only change class count / bit count for 22K.</p>
+    <table>
+      <tr><th>Field</th><th>AB setting</th></tr>
+      <tr><td>Model</td><td><code>ViT_base_mdh_mlp</code></td></tr>
+      <tr><td>Head</td><td>tiny-bit MLP diffusion head: <code>bit_dim=8</code>, hidden dim <code>3072</code>, <code>head_n_layers=2</code>, activation <code>gelu</code>, no head LayerNorm</td></tr>
+      <tr><td>Masking</td><td><code>n_masks_per_image=80</code>, <code>mask_schedule=uniform</code>, <code>eval_iter_steps=4</code></td></tr>
+      <tr><td>Loss / label mode</td><td>masked bit CE, <code>diffusion_label_mode=soft_top2</code>; for mix/cut images, split the K repeated diffusion targets across the two labels instead of using a hard argmax label</td></tr>
+      <tr><td>Augmentation</td><td><code>use_rand_augment=false</code>, <code>reprob=0.0</code>, <code>repeated_aug=1</code>, <code>use_mixup_cutmix=true</code>, <code>mixup_alpha=0.8</code>, <code>cutmix_alpha=1.0</code>, <code>switch_prob=0.5</code></td></tr>
+      <tr><td>Optimizer</td><td>AdamW, LR <code>5e-4</code>, <code>adamw_b2=0.95</code>, WD <code>0.02</code>, batch size <code>1024</code>, epochs <code>330</code></td></tr>
+      <tr><td>Regularization</td><td>dropout <code>0.0</code>, stochastic depth <code>0.05</code>, grad clip <code>null</code></td></tr>
+      <tr><td>Hard constraints</td><td><code>load_from=''</code> for fresh runs, <code>load_backbone_from=''</code>, <code>head_aux_ce=false</code>, <code>aux_ce_loss_weight=0.0</code>. Same-run checkpoint resume is okay; CE/backbone warm-start is not.</td></tr>
+      <tr><td>Config file</td><td><code>configs/remote_run_AB_mlp_k80_lowaug_mixlabel_config.yml</code></td></tr>
+      <tr><td>Logdir</td><td><code>/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval</code></td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>3. AB Learning Curve</h2>
+    <table>
+      <tr><th>Epoch</th><th>Single-step acc</th><th>Iterative acc</th><th>Loss</th><th>Invalid rate</th><th>Read</th></tr>
+      <tr><td>59</td><td>64.890%</td><td>68.616%</td><td>0.293254</td><td>0.576%</td><td>First strong read inside this 24h window</td></tr>
+      <tr><td>99</td><td>70.380%</td><td>73.076%</td><td>0.262941</td><td>0.424%</td><td>Established K80 low-aug + mix/cut as best early branch</td></tr>
+      <tr><td>159</td><td>73.496%</td><td>75.538%</td><td>0.253380</td><td>0.338%</td><td>Still climbing</td></tr>
+      <tr><td>219</td><td>74.726%</td><td>76.526%</td><td>0.255938</td><td>0.298%</td><td>AH barely beats this matched point later</td></tr>
+      <tr><td>259</td><td>75.758%</td><td>77.414%</td><td>0.256073</td><td>0.250%</td><td>Clear mature best at the time</td></tr>
+      <tr><td>299</td><td>76.266%</td><td>77.988%</td><td>0.252067</td><td>0.260%</td><td>Late growth continues</td></tr>
+      <tr><td>319</td><td><strong>76.600%</strong></td><td><strong>78.294%</strong></td><td><strong>0.248487</strong></td><td>0.274%</td><td>Best useful eval; run then finished around ep330 before another scheduled eval</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>4. Main Experiment Matrix</h2>
+    <table>
+      <tr><th>Run</th><th>Design</th><th>Latest / best useful result</th><th>Status</th><th>Interpretation</th></tr>
+      <tr><td>AB / 6435</td><td>K80, low aug, mixup+cutmix, <code>soft_top2</code>, p=0.5</td><td><strong>ep319 76.600 / 78.294</strong></td><td>Finished</td><td>Best deployable pure-diffusion config.</td></tr>
+      <tr><td>AH / 6448</td><td>K80, low aug, cutmix-heavy, <code>switch_prob=0.75</code></td><td>ep239 75.364 / 77.016</td><td>Running ep244</td><td>Matched-epoch competitive, but not better than mature AB.</td></tr>
+      <tr><td>AI / 6469</td><td>K80, low aug, interpolation p=0.625; manual resume from own checkpoint</td><td>ep59 63.920 / 67.830</td><td>Running ep66</td><td>Healthy, but below AB/AH/AF at matched ep59; wait ep79 before retiring.</td></tr>
+      <tr><td>AF / 6441</td><td>K80, low aug, cutmix-only</td><td>ep199 73.162 / 74.960</td><td>Retired</td><td>Early acceleration did not hold; dominated by AB at mature checkpoints.</td></tr>
+      <tr><td>Z / 6453</td><td>K80, full baseline augmentation, mixup+cutmix, <code>soft_top2</code></td><td>ep139 62.192 / 66.086</td><td>Running ep144</td><td>Delayed catch-up exists, but it remains far below low-aug K80.</td></tr>
+      <tr><td>S / 6433</td><td>K10, full baseline augmentation, mixup+cutmix, <code>soft_top2</code></td><td>ep319 69.324 / 72.296</td><td>Finished</td><td>Full aug improves slowly but is not competitive with AB.</td></tr>
+      <tr><td>CF / 6457</td><td>CE sanity, <code>ViT_base_v3</code> + current fixes, no warm-start</td><td>ep79 55.926</td><td>Running ep80+</td><td>Sanity path alive, but reference reproduction still incomplete.</td></tr>
+      <tr><td>AJ / 6474</td><td>AB + RandAugment only; no reprob, no repeated aug</td><td>eval0 0.104 / 0.114</td><td>Running ep7</td><td>Medium-augmentation compromise; first meaningful read is ep19.</td></tr>
+      <tr><td>AK / 6475</td><td>AB + RandAugment + reprob=0.25; no repeated aug</td><td>eval0 0.098 / 0.116</td><td>Running after healthy startup</td><td>Tests whether RA+random-erasing helps without full-aug slowness.</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>5. Augmentation Finding</h2>
+    <p>The user hypothesis was that adding augmentation back may slow early convergence but improve late generalization. The current evidence is: <strong>yes, full augmentation catches up slowly, but it remains much too far behind AB within the tested horizon.</strong></p>
+    <table>
+      <tr><th>Matched epoch</th><th>AB K80 low aug + mix/cut</th><th>Z K80 full aug + mix/cut</th><th>Gap single / iterative</th></tr>
+      <tr><td>99</td><td>70.380 / 73.076</td><td>57.724 / 62.532</td><td>AB +12.656 / +10.544</td></tr>
+      <tr><td>119</td><td>71.886 / 74.052</td><td>60.146 / 64.446</td><td>AB +11.740 / +9.606</td></tr>
+      <tr><td>139</td><td>72.550 / 74.542</td><td>62.192 / 66.086</td><td>AB +10.358 / +8.456</td></tr>
+    </table>
+    <p>S K10 full-aug finished at ep319 <code>69.324 / 72.296</code>, still below AB even at much later epochs. Therefore the next sensible direction is not more full augmentation; it is medium augmentation: AJ adds only RandAugment, AK adds RandAugment plus random erasing, both keeping AB's low WD/SD and no repeated augmentation.</p>
+  </section>
+
+  <section class="card">
+    <h2>6. MixUp/CutMix Label Fix</h2>
+    <p>A major implementation issue in the old runs was mixed images being supervised as a single hard argmax class. Over the last 24h, the useful experiments use the corrected diffusion label path:</p>
+    <ul>
+      <li><code>diffusion_label_mode=soft_top2</code> takes the top two labels from mixup/cutmix.</li>
+      <li>The <code>K = n_masks_per_image</code> repeated diffusion targets are split between the two labels according to their mixture weights.</li>
+      <li>Example: for K80 and a 50/50 cutmix, 40 mask views train toward label A and 40 train toward label B.</li>
+      <li>This preserves the pure masked-bit objective while making mixup/cutmix semantically correct.</li>
+    </ul>
+    <p>AB is the strongest evidence that corrected mix/cut supervision is useful: it beat prior no-mix K80 references and continued improving late.</p>
+  </section>
+
+  <section class="card">
+    <h2>7. Sanity Run Status</h2>
+    <p>We checked the implementation against <code>../papers/DeiT</code> details and aligned several CE sanity details: exact GELU, AdamW <code>beta2=0.999</code> for CE sanity, label-smoothing wiring, and input-pipeline behavior. The outcome is mixed:</p>
+    <table>
+      <tr><th>Sanity branch</th><th>Result</th><th>Conclusion</th></tr>
+      <tr><td>v2/no-LayerScale sanity</td><td>ep99 56.084%</td><td>Did not reproduce old v3 sanity; retired.</td></tr>
+      <tr><td>CF: <code>ViT_base_v3</code> + current fixes</td><td>ep19 37.472, ep39 49.134, ep59 53.316, ep79 55.926</td><td>Healthy and better than v2/no-LayerScale, but still below old v3 references such as ep59 59.132 and ep99 62.754. Continue to ep99 before more code changes.</td></tr>
+    </table>
+    <p>Interpretation: the current code path is not catastrophically broken, but the full DeiT baseline reproduction gap remains unresolved. This should not block AB-style diffusion research, but it remains an open risk for final absolute accuracy.</p>
+  </section>
+
+  <section class="card">
+    <h2>8. Operational / Debugging Progress</h2>
+    <ul>
+      <li><strong>Z resume fixed:</strong> manager auto-resume produced duplicate <code>config.load_from</code> flags. Manual resume from Z's own checkpoint fixed the issue and produced the active Z run.</li>
+      <li><strong>AI resume fixed:</strong> original AI stopped due spot/SSH failure. Auto-resume failed with the same duplicate <code>config.load_from</code> pattern. Manual resume as 6469 restored from AI's own <code>checkpoint_25020</code> and is training normally.</li>
+      <li><strong>Stale errors quarantined:</strong> stale 6472, 6467, and 6463 were repeatedly ignored; they should not drive scientific decisions.</li>
+      <li><strong>Forbidden aux-CE branch avoided:</strong> parent 6381 still references resumed 6459, but no active 6459 window has appeared. We have not used aux CE, CE warm-start, or backbone loading for the effective diffusion experiments.</li>
+      <li><strong>New medium-augmentation branches launched:</strong> AJ and AK were launched after S/AB freed slots, directly addressing the question of whether some augmentation can improve late growth without the full-aug penalty.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>9. ImageNet-22K Handoff Recommendation</h2>
+    <p>For the collaborator with ImageNet-22K data, the safest faithful recipe today is AB, not the full-augmentation Z/S branches and not any CE-assisted branch.</p>
+    <pre><code>model: ViT_base_mdh_mlp
+batch_size: 1024
+learning_rate: 0.0005
+num_epochs: 330
+optimizer: adamw
+adamw_b2: 0.95
+weight_decay: 0.02
+dropout_rate: 0.0
+stochastic_depth_rate: 0.05
+
+use_diffusion_head: true
+head_type: mlp
+head_bit_dim: 8
+head_mlp_hidden_dim: 3072
+head_mlp_activation: gelu
+head_mlp_layer_norm: false
+head_n_layers: 2
+mask_schedule: uniform
+diffusion_label_mode: soft_top2
+eval_iter_steps: 4
+n_masks_per_image: 80
+head_aux_ce: false
+aux_ce_loss_weight: 0.0
+load_from: ''
+load_backbone_from: ''
+
+dataset:
+  use_rand_augment: false
+  reprob: 0.0
+  repeated_aug: 1
+  use_mixup_cutmix: true
+  mixup_prob: 1.0
+  switch_prob: 0.5
+  mixup_alpha: 0.8
+  cutmix_alpha: 1.0
+  label_smoothing: 0.1
+  num_tpus: 8</code></pre>
+    <p>For 21,841 classes, set <code>n_bits=15</code>. Evaluation must count predicted codes <code>&gt;= num_classes</code> as invalid/wrong and report invalid rate; do not silently clip invalid codes for final reporting.</p>
+    <p><strong>Do not 投敌:</strong> do not warm-start from CE, do not set <code>load_backbone_from</code>, do not add an auxiliary CE loss, and do not train a standard class-logit head as a crutch. Same-run checkpoint resume after preemption is allowed.</p>
+  </section>
+
+  <section class="card">
+    <h2>10. Next 24h Plan</h2>
+    <ul>
+      <li>Let AH reach ep259 if slots permit, but treat it as a matched-epoch challenger rather than the current best.</li>
+      <li>Let AI reach ep79; ep59 is already below AB/AH/AF, so retire if ep79 does not recover.</li>
+      <li>Let AJ and AK reach ep19/39; compare medium augmentation against AB/AH early curves.</li>
+      <li>Let Z reach ep159 to quantify whether full augmentation continues closing the gap or remains dominated.</li>
+      <li>Let CF sanity reach ep99 before changing sanity code again.</li>
+      <li>Keep enforcing no warm-start / no aux CE / no backbone load in all main diffusion branches.</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

@@ -60,16 +60,22 @@ def get_config():
   config.stochastic_depth_rate = 0.0
   config.weight_decay = 0.0
   config.optimizer = 'adamw'
-  config.adamw_b2 = 0.95
+  config.adamw_b2 = 0.999
   config.eval_only = False
 
   # Phase 2: masked diffusion head
   config.use_diffusion_head = False
   config.head_inner_dim = 256
-  config.head_n_layers = 2
+  config.head_bit_dim = 8           # for MLP diffusion head bit-token embedding
+  config.head_mlp_hidden_dim = 3072 # for MLP diffusion head decoder capacity
+  config.head_mlp_activation = 'gelu' # 'gelu' | 'silu'
+  config.head_mlp_layer_norm = False # optional LayerNorm after each MLP hidden projection
+  config.head_n_layers = 4          # attention head depth (cross-attn blocks)
   config.head_n_heads = 4
   config.mask_schedule = 'uniform'   # 'uniform' or 'logit_normal'
+  config.diffusion_label_mode = 'argmax' # 'argmax' or 'soft_top2' for mixup/cutmix K-view label allocation
   config.eval_iter_steps = 4         # iterative decode steps in eval
+  config.n_masks_per_image = 1       # K masks per image with shared backbone forward
   config.head_type = 'attention'     # 'attention' | 'mlp'
   config.head_zero_init_proj = False  # zero-init final projection layer of diffusion head
   config.head_aux_ce = False          # auxiliary CE head alongside diffusion head

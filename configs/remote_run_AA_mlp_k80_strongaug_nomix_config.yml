@@ -1,11 +1,8 @@
-# Phase 2 Run AK: tiny-bit MLP K80 + RandAugment + random erasing medium augmentation + corrected mixup/cutmix soft_top2
-# Purpose: extend AJ by adding random erasing, while still avoiding repeated_aug=3 and stronger WD/SD.
-# This isolates whether RA/reprob image augmentation can help late generalization without full-aug's severe slow convergence.
+# Phase 2 Run AA: tiny-bit MLP K80 + baseline RA/reprob/repeated/WD/SD, but no mixup/cutmix
+# Purpose: isolate whether mixup/cutmix soft-label splitting is the main cause of slow full-augmentation convergence.
 # No warm-start, no aux CE, no CE shortcut.
 
 model: ViT_base_mdh_mlp
-load_from: ''
-load_backbone_from: ''
 
 dataset:
     num_workers: 16
@@ -15,13 +12,13 @@ dataset:
     rand_augment: rand-m9-mstd0.5-inc1
     reprob: 0.25
 
-    use_mixup_cutmix: true
+    use_mixup_cutmix: false
     mixup_prob: 1.0
     switch_prob: 0.5
     mixup_alpha: 0.8
     cutmix_alpha: 1.0
 
-    repeated_aug: 1
+    repeated_aug: 3
     label_smoothing: 0.1
     num_tpus: 8
 
@@ -31,10 +28,10 @@ num_epochs: 330
 log_per_step: 100
 
 optimizer: adamw
-weight_decay: 0.02
+weight_decay: 0.05
 adamw_b2: 0.95
 dropout_rate: 0.0
-stochastic_depth_rate: 0.05
+stochastic_depth_rate: 0.1
 grad_norm_clip: null
 
 use_diffusion_head: true
@@ -42,10 +39,9 @@ head_type: mlp
 head_bit_dim: 8
 head_mlp_hidden_dim: 3072
 head_mlp_activation: gelu
-head_mlp_layer_norm: false
 head_n_layers: 2
 mask_schedule: uniform
-diffusion_label_mode: soft_top2
+diffusion_label_mode: argmax
 eval_iter_steps: 4
 n_masks_per_image: 80
 head_aux_ce: false
@@ -55,14 +51,12 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
-    wandb_notes: 'deit phase2 Run AK: MLP K80 RandAug+reprob + corrected mixup/cutmix soft_top2; no CE shortcut'
+    wandb_notes: 'deit phase2 Run AA: MLP K80 + baseline RA/reprob/repeated/WD/SD, no mixup/cutmix; no CE shortcut'
     wandb_tags:
         - sqa
         - phase2
         - mlp-head
         - tiny-bit
         - k80
-        - randaug-reprob
-        - medium-aug
-        - mixup-cutmix-soft-top2
+        - strong-aug-no-mixcut
         - no-ce-shortcut

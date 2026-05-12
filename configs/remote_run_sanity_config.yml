@@ -6,9 +6,10 @@
 # 4. CLS token init: normal(1e-6) (was truncated_normal(0.02))
 # 5. Stochastic depth: linear schedule 0→0.1 per layer (was uniform 0.1 everywhere)
 # 6. Final LayerNorm: use_bias=True (was False)
-# Architecture: ViT_base_v3 (biases=True, LearnedScale=True) — same best arch from Phase 1
+# 7. No LayerScale / LearnedScale (matches ../papers/DeiT reference block)
+# Architecture: ViT_base_v2 (biases=True, LearnedScale=False)
 
-model: ViT_base_v3
+model: ViT_base_v2
 
 dataset:
     num_workers: 16
@@ -35,7 +36,8 @@ log_per_step: 100
 
 optimizer: adamw
 weight_decay: 0.05
-adamw_b2: 0.95
+adamw_b2: 0.999
+label_smoothing: 0.0
 dropout_rate: 0.0
 stochastic_depth_rate: 0.1
 grad_norm_clip: null
@@ -44,9 +46,10 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
-    wandb_notes: 'sanity-run: full alignment with reference (WD mask, b2=0.999, LR schedule, cls init, stochastic depth schedule, final LN bias) — target 81.8%'
+    wandb_notes: 'sanity-run: full alignment with reference (WD mask, b2=0.999, LR schedule, cls init, exact GELU, no LayerScale, final LN bias) — target 81.8%'
     wandb_tags:
         - sqa
         - phase1-sanity
         - wd-mask
         - b2-0.999
+        - no-layerscale

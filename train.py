@@ -110,7 +110,7 @@ def initialized(key, image_size, model):
   return variables['params'], variables['batch_stats']
 
 
-def cross_entropy_loss(logits, labels, label_smoothing=0.1):
+def cross_entropy_loss(logits, labels, label_smoothing=0.0):
   labels = labels.astype(jnp.float32)
   # one_hot_labels = common_utils.onehot(labels, num_classes=NUM_CLASSES)
   # apply label smoothing
@@ -186,7 +186,7 @@ def create_learning_rate_fn(
 
 
 
-def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.1):
+def train_step_sqa(state, batch, rng_init, learning_rate_fn,label_smoothing=0.0):
   """Perform a single training step."""
 
   # ResNet has no dropout; but maintain rng_dropout for future usage
@@ -258,53 +258,105 @@ def eval_step_agg(state, batch):
   return lax.psum(stats, axis_name='batch')
 
 
-def train_step_diffusion(state, batch, rng_init, learning_rate_fn, mask_schedule='uniform', aux_ce_loss_weight=0.0):
+def make_diffusion_bits(labels_soft, n_masks_per_image=1, label_mode='argmax'):
+  """Build repeated hard bit targets for diffusion training.
+
+  `soft_top2` is for mixup/cutmix: K repeated mask views are split between the
+  top-2 labels in proportion to their soft-label weights. For K=10 and a 50/50
+  mixed sample this gives 5 views of each class.
+  """
+  K = max(1, int(n_masks_per_image))
+  if label_mode == 'argmax':
+    labels_int = jnp.argmax(labels_soft, axis=-1).astype(jnp.int32)  # (B,)
+    bits_base = models.class_to_bits(labels_int)                    # (B, n_bits)
+    return jnp.repeat(bits_base, repeats=K, axis=0)                 # (B*K, n_bits)
+
+  if label_mode == 'soft_top2':
+    top_vals, top_idx = lax.top_k(labels_soft.astype(jnp.float32), 2)
+    top_vals = top_vals / (jnp.sum(top_vals, axis=-1, keepdims=True) + 1e-8)
+    view_frac = (jnp.arange(K, dtype=jnp.float32) + 0.5) / float(K)  # (K,)
+    choose_second = view_frac[None, :] >= top_vals[:, 0:1]          # (B, K)
+    labels_rep = jnp.where(choose_second, top_idx[:, 1:2], top_idx[:, 0:1])
+    labels_rep = labels_rep.reshape(-1).astype(jnp.int32)           # (B*K,)
+    return models.class_to_bits(labels_rep)                         # (B*K, n_bits)
+
+  raise ValueError(f'Unknown diffusion_label_mode={label_mode!r}')
+
+
+def train_step_diffusion(state, batch, rng_init, learning_rate_fn, mask_schedule='uniform', aux_ce_loss_weight=0.0, n_masks_per_image=1, head_type='attention', diffusion_label_mode='argmax'):
   """Training step for masked diffusion head."""
   rng_step = random.fold_in(rng_init, state.step)
   rng_device = random.fold_in(rng_step, lax.axis_index(axis_name='batch'))
   rng_dropout, rng_mask = random.split(rng_device)
 
   def loss_fn(params):
-    labels_soft = batch['label']                                   # (B, NUM_CLASSES) one-hot (no mixup for diffusion)
-    labels_int = jnp.argmax(labels_soft, axis=-1).astype(jnp.int32)  # (B,) hard labels
-    bits = models.class_to_bits(labels_int)                        # (B, n_bits)
-    B, n_bits = bits.shape
+    labels_soft = batch['label']                                   # (B, NUM_CLASSES) one-hot or mixup/cutmix soft label
+    B = labels_soft.shape[0]
+    K = max(1, int(n_masks_per_image))
+    bits = make_diffusion_bits(labels_soft, K, diffusion_label_mode)
+    n_bits = bits.shape[-1]
+
+    # Encode image once, then reuse encoded representation for K different masks.
+    if head_type == 'mlp':
+      features = state.apply_fn(
+        {'params': params, 'batch_stats': state.batch_stats},
+        batch['image'],
+        mutable=False,
+        rng=rng_dropout,
+        train=True,
+        method=models.ViT.encode,
+      )                                                             # (B, 768)
+      features = jnp.repeat(features, repeats=K, axis=0)           # (B*K, 768)
+      decode_method = models.ViT.decode_diffusion_from_cls
+    else:
+      features = state.apply_fn(
+        {'params': params, 'batch_stats': state.batch_stats},
+        batch['image'],
+        mutable=False,
+        rng=rng_dropout,
+        train=True,
+        method=models.ViT.encode_tokens,
+      )                                                             # (B, T, 768)
+      features = jnp.repeat(features, repeats=K, axis=0)           # (B*K, T, 768)
+      decode_method = models.ViT.decode_diffusion_from_tokens
+
+    labels_soft_rep = jnp.repeat(labels_soft, repeats=K, axis=0)   # (B*K, NUM_CLASSES)
 
     # Sample mask ratio t, then mask each bit independently
     rng_t, rng_b = random.split(rng_mask)
     if mask_schedule == 'logit_normal':
       # t = sigmoid(z * 2), z ~ Normal(0,1) — concentrates mask ratio near 0.5
-      z = random.normal(rng_t, (B, 1))
+      z = random.normal(rng_t, (B * K, 1))
       t = jax.nn.sigmoid(z * 2.0)
     else:  # uniform
-      t = random.uniform(rng_t, (B, 1))
-    bit_mask = (random.uniform(rng_b, (B, n_bits)) < t).astype(jnp.float32)
+      t = random.uniform(rng_t, (B * K, 1))
+    bit_mask = (random.uniform(rng_b, (B * K, n_bits)) < t).astype(jnp.float32)
     masked_bits = jnp.where(bit_mask.astype(bool), 2, bits).astype(jnp.int32)
 
     out = state.apply_fn(
       {'params': params, 'batch_stats': state.batch_stats},
-      batch['image'],
-      mutable=['batch_stats'],
-      rng=rng_dropout,
+      features,
+      mutable=False,
       masked_bits=masked_bits,
       return_aux_ce=(aux_ce_loss_weight > 0.0),
+      method=decode_method,
     )
     if aux_ce_loss_weight > 0.0:
-      (logits, ce_logits), new_model_state = out
+      logits, ce_logits = out
       diff_loss = masked_diffusion_loss(logits, bits, bit_mask)
-      ce_loss = jnp.mean(optax.softmax_cross_entropy(logits=ce_logits, labels=labels_soft))
+      ce_loss = jnp.mean(optax.softmax_cross_entropy(logits=ce_logits, labels=labels_soft_rep))
       loss = diff_loss + aux_ce_loss_weight * ce_loss
     else:
-      logits, new_model_state = out
+      logits = out
       loss = masked_diffusion_loss(logits, bits, bit_mask)
-    return loss, (new_model_state, logits, bits, bit_mask)
+    return loss, (logits, bits)
 
   step = state.step
   lr = learning_rate_fn(step)
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
   aux, grads = grad_fn(state.params)
   grads = lax.pmean(grads, axis_name='batch')
-  new_model_state, logits, bits, bit_mask = aux[1]
+  logits, bits = aux[1]
 
   # Accuracy: decode greedily and compare
   pred_classes = diffusion_decode_greedy(logits)                  # (B,)
@@ -317,7 +369,7 @@ def train_step_diffusion(state, batch, rng_init, learning_rate_fn, mask_schedule
   metrics = jax.tree.map(lambda x: x.flatten(), metrics)
 
   new_state = state.apply_gradients(
-    grads=grads, batch_stats=new_model_state['batch_stats']
+    grads=grads, batch_stats=state.batch_stats
   )
   return new_state, metrics
 
@@ -539,6 +591,10 @@ def train_and_evaluate(
     dropout_rate=config.dropout_rate,
     stochastic_depth_rate=config.stochastic_depth_rate,
     head_inner_dim=config.get('head_inner_dim', 256),
+    head_bit_dim=config.get('head_bit_dim', 8),
+    head_mlp_hidden_dim=config.get('head_mlp_hidden_dim', 3072),
+    head_mlp_activation=config.get('head_mlp_activation', 'gelu'),
+    head_mlp_layer_norm=config.get('head_mlp_layer_norm', False),
     head_n_layers=config.get('head_n_layers', 2),
     head_n_heads=config.get('head_n_heads', 4),
     head_type=config.get('head_type', 'attention'),
@@ -562,13 +618,17 @@ def train_and_evaluate(
   state = jax_utils.replicate(state)
 
   p_train_step = jax.pmap(
-    functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn, label_smoothing=0.0),
+    functools.partial(train_step_sqa, rng_init=rng, learning_rate_fn=learning_rate_fn,
+                      label_smoothing=config.get('label_smoothing', 0.0)),
     axis_name='batch',
     donate_argnums=(0, 1),
   ) if not use_diffusion_head else jax.pmap(
     functools.partial(train_step_diffusion, rng_init=rng, learning_rate_fn=learning_rate_fn,
                       mask_schedule=config.get('mask_schedule', 'uniform'),
-                      aux_ce_loss_weight=config.get('aux_ce_loss_weight', 0.0) if config.get('head_aux_ce', False) else 0.0),
+                      aux_ce_loss_weight=config.get('aux_ce_loss_weight', 0.0) if config.get('head_aux_ce', False) else 0.0,
+                      n_masks_per_image=config.get('n_masks_per_image', 1),
+                      head_type=config.get('head_type', 'attention'),
+                      diffusion_label_mode=config.get('diffusion_label_mode', 'argmax')),
     axis_name='batch',
     donate_argnums=(0, 1),
   )
@@ -588,7 +648,8 @@ def train_and_evaluate(
 
     for n_batch, batch in enumerate(train_loader):
       batch = pre_process_batch(batch)
-      if not use_diffusion_head:
+      diffusion_label_mode = config.get('diffusion_label_mode', 'argmax')
+      if (not use_diffusion_head) or diffusion_label_mode == 'soft_top2':
         batch = apply_mixup_cutmix_batch(config.dataset, batch)
       step = epoch * steps_per_epoch + n_batch
       batch = prepare_batch_data_sqa(batch)

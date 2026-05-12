@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeiT Masked Diffusion Head Progress Report - 2026-05-11 18:21 UTC</title>
+  <style>
+    :root {
+      --ink: #1d242b;
+      --muted: #5e6a72;
+      --line: #d9e0e5;
+      --bg: #f7f4ec;
+      --card: #fffdf7;
+      --accent: #0f6b5f;
+      --accent2: #b24a24;
+      --good: #0a7b48;
+      --warn: #9b6500;
+      --bad: #9a2d22;
+    }
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #f7f4ec 0%, #edf4f1 60%, #f8efe8 100%);
+      color: var(--ink);
+      font-family: ui-serif, Georgia, "Times New Roman", "Noto Serif CJK SC", serif;
+      line-height: 1.55;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 42px 24px 64px; }
+    header { border-bottom: 3px solid var(--ink); padding-bottom: 18px; margin-bottom: 28px; }
+    h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.15; letter-spacing: -0.02em; }
+    h2 { margin: 34px 0 12px; font-size: 23px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    h3 { margin: 22px 0 8px; font-size: 18px; }
+    p { margin: 8px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.94em; background: #eef3f0; padding: 1px 5px; border-radius: 4px; }
+    .meta { color: var(--muted); font-size: 14px; }
+    .callout { background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--accent); padding: 14px 16px; margin: 18px 0; box-shadow: 0 8px 24px rgba(20, 40, 35, 0.06); }
+    .warning { border-left-color: var(--accent2); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 14px 0; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+    .metric { font-size: 26px; font-weight: 700; color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; background: rgba(255, 253, 247, 0.85); }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; }
+    th { background: #e9f1ee; text-align: left; font-weight: 700; }
+    tr.best td { background: #eaf7ef; }
+    tr.retired td { color: var(--muted); background: #f5f2ec; }
+    .good { color: var(--good); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    ul { padding-left: 22px; }
+    .small { font-size: 14px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>DeiT Masked Diffusion Head Progress Report</h1>
+    <div class="meta">Snapshot: 2026-05-11 18:21 UTC. Workspace: <code>/kmh-nfs-ssd-us-mount/code/qiao/work/DeiT</code>.</div>
+  </header>
+
+  <section class="callout">
+    <h2 style="margin-top:0">Executive Summary</h2>
+    <p><strong>当前最好的配置是 Run AB</strong>: <code>K=80</code>, low augmentation, GELU MLP diffusion head, corrected mixup/cutmix <code>soft_top2</code> label allocation, no warm-start, no auxiliary CE loss. 最新 ep99 eval 为 <span class="metric">70.380%</span> single-step / <span class="metric">73.076%</span> iterative, invalid rate <code>0.424%</code>.</p>
+    <p>CutMix 信号明显强于 Mixup: Run AF cutmix-only 在 ep39 达到 <strong>58.938 / 63.560</strong>, 高于 AB matched ep39 <strong>57.148 / 61.642</strong> 和 AE mixup-only ep39 <strong>55.496 / 59.818</strong>. 因此 AE 已退役，新的 Run AH 已启动，用 <code>switch_prob=0.75</code> 测试 cutmix-heavy mixture。</p>
+    <p>Full augmentation 有后期追赶但目前仍不如 AB: Run S 从 ep99 <code>50.646/56.452</code> 到 ep139 <code>58.748/63.468</code>，说明不能仅按早期收敛判断；但它仍显著落后 AB。</p>
+  </section>
+
+  <section>
+    <h2>Best Config To Reproduce</h2>
+    <table>
+      <tr><th>Item</th><th>Value</th></tr>
+      <tr><td>Run</td><td><strong>AB</strong>: <code>configs/remote_run_AB_mlp_k80_lowaug_mixlabel_config.yml</code></td></tr>
+      <tr><td>Model</td><td><code>ViT_base_mdh_mlp</code>, pure diffusion head, no CE shortcut</td></tr>
+      <tr><td>Head</td><td>MLP diffusion head, <code>bit_dim=8</code>, <code>hidden_dim=3072</code>, <code>n_layers=2</code>, <code>activation=gelu</code>, <code>head_mlp_layer_norm=false</code></td></tr>
+      <tr><td>Mask views</td><td><code>n_masks_per_image=80</code>; image backbone encoded once, CLS features repeated for K mask views</td></tr>
+      <tr><td>Label allocation</td><td><code>diffusion_label_mode=soft_top2</code>; K repeated views split between top-2 soft labels according to their weights. For 50/50 mix and K=80 this gives 40/40 target views.</td></tr>
+      <tr><td>Augmentation</td><td>Low aug: <code>use_rand_augment=false</code>, <code>reprob=0.0</code>, <code>repeated_aug=1</code>, <code>label_smoothing=0.1</code>. Mix/Cut: <code>use_mixup_cutmix=true</code>, <code>mixup_prob=1.0</code>, <code>switch_prob=0.5</code>, <code>mixup_alpha=0.8</code>, <code>cutmix_alpha=1.0</code>.</td></tr>
+      <tr><td>Optimization</td><td><code>batch_size=1024</code>, <code>learning_rate=0.0005</code>, <code>num_epochs=330</code>, AdamW, <code>weight_decay=0.02</code>, <code>adamw_b2=0.95</code>, <code>stochastic_depth_rate=0.05</code>, <code>dropout_rate=0.0</code>.</td></tr>
+      <tr><td>Eval</td><td><code>eval_iter_steps=4</code>; report both single-step and iterative accuracy plus invalid code rate.</td></tr>
+      <tr><td>Forbidden shortcuts</td><td><strong>No warm-start</strong>: <code>load_from=''</code>, <code>load_backbone_from=''</code>. <strong>No aux CE</strong>: <code>head_aux_ce=false</code>, <code>aux_ce_loss_weight=0.0</code>.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Key Results</h2>
+    <table>
+      <tr><th>Run</th><th>Config</th><th>Checkpoint</th><th>Single / Iterative Acc</th><th>Read</th></tr>
+      <tr class="best"><td>AB</td><td>K80 low-aug mixed mixup/cutmix <code>soft_top2</code></td><td>ep99</td><td><strong>70.380 / 73.076</strong></td><td>Current best. Still improving after ep79.</td></tr>
+      <tr><td>AB</td><td>same</td><td>ep79</td><td>68.464 / 71.404</td><td>Already exceeded all previous pure-diffusion runs.</td></tr>
+      <tr><td>AB</td><td>same</td><td>ep59</td><td>64.890 / 68.616</td><td>First point that beat old completed K10 baseline.</td></tr>
+      <tr><td>AF</td><td>K80 low-aug cutmix-only <code>soft_top2</code></td><td>ep39</td><td><strong>58.938 / 63.560</strong></td><td>Best matched ep39 result; keep to ep59.</td></tr>
+      <tr class="retired"><td>AE</td><td>K80 low-aug mixup-only <code>soft_top2</code></td><td>ep39</td><td>55.496 / 59.818</td><td>Retired; dominated by AF and AB.</td></tr>
+      <tr><td>S</td><td>K10 full baseline aug + corrected mix/cut <code>soft_top2</code></td><td>ep139</td><td>58.748 / 63.468</td><td>Late catch-up is real, but still behind AB.</td></tr>
+      <tr><td>AG</td><td>K160 low-aug mixed mix/cut <code>soft_top2</code></td><td>ep19</td><td>32.340 / 39.472</td><td>No early gain over AB K80 at ep19; keep to ep39 for verdict.</td></tr>
+      <tr><td>T</td><td>K80 low-aug no mix/cut</td><td>ep219</td><td>62.162 / 65.682</td><td>Retired; dominated by AB ep59.</td></tr>
+      <tr><td>N</td><td>K10 low-aug no mix/cut</td><td>ep319</td><td>63.604 / 67.726</td><td>Previous best completed pure-diffusion baseline; beaten by AB.</td></tr>
+      <tr><td>Z</td><td>K80 full baseline aug + corrected mix/cut <code>soft_top2</code></td><td>ep19 original</td><td>3.694 / 7.152</td><td>Very slow; resumed on v5p-8 and currently around ep39, no new eval yet.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Active Runs</h2>
+    <table>
+      <tr><th>Run</th><th>Status at 18:21 UTC</th><th>Latest Useful Eval</th><th>Decision</th></tr>
+      <tr><td>AB</td><td>window 6435, running around ep102</td><td>ep99: 70.380 / 73.076</td><td>Preserve; next important checkpoint ep119.</td></tr>
+      <tr><td>AF</td><td>window 6441, running around ep46</td><td>ep39: 58.938 / 63.560</td><td>Keep to ep59; it may beat AB trajectory early.</td></tr>
+      <tr><td>AH</td><td>window 6448, running around ep5</td><td>eval0: 0.074 / 0.100</td><td>New cutmix-heavy run, <code>switch_prob=0.75</code>; wait ep19.</td></tr>
+      <tr><td>S</td><td>window 6433, running around ep154</td><td>ep139: 58.748 / 63.468</td><td>Keep; full-aug late catch-up control, next ep159.</td></tr>
+      <tr><td>AG</td><td>window 6447, running around ep26.7</td><td>ep19: 32.340 / 39.472</td><td>Keep to ep39 unless slot pressure increases.</td></tr>
+      <tr><td>Z</td><td>window 6446, running around ep39.3 on v5p-8</td><td>resume eval not printed yet</td><td>Keep to get missing full-aug K80 ep39 control.</td></tr>
+    </table>
+    <p class="small">Ignore stale manager artifacts such as 6442/6443/6444 failures; they are rerun/infrastructure records, not active intended experiments.</p>
+  </section>
+
+  <section>
+    <h2>Interpretation</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>1. Corrected mix/cut labels matter</h3>
+        <p>Using <code>soft_top2</code> fixes the earlier label-noise problem where mixed images were supervised by a single argmax class. AB's trajectory now clearly exceeds old K10/K80 baselines.</p>
+      </div>
+      <div class="card">
+        <h3>2. CutMix is the stronger component</h3>
+        <p>AF beats AE at ep19 and ep39, and also beats AB at matched ep39. Current hypothesis: cutmix provides useful spatially localized label composition, while mixup-only is weaker for bit diffusion.</p>
+      </div>
+      <div class="card">
+        <h3>3. Full augmentation is not best yet</h3>
+        <p>S proves slow early convergence can be misleading, but even after late catch-up it remains far below AB. Z is still needed for K80 full-aug + mix/cut, but it is very slow.</p>
+      </div>
+      <div class="card">
+        <h3>4. Larger K is not automatically better</h3>
+        <p>Past K160/K320/K640 low-aug no-mix runs did not improve over K80, and AG K160 mixed is not ahead at ep19. Avoid further K increases until AG ep39 is known.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="callout warning">
+    <h2 style="margin-top:0">Protocol Guardrails</h2>
+    <p><strong>Do not use warm-start from CE, do not load a pretrained CE backbone, and do not add auxiliary CE loss.</strong> The current results are pure diffusion-head training. Same-run checkpoint resume is allowed only for infrastructure failures, as in Z resuming from its own <code>checkpoint_25020</code>.</p>
+    <p>For collaborator reproduction, the recommended first run is AB exactly. If only one variant can be added, run AF or AH to test the cutmix-heavy hypothesis, but do not replace AB until AF/AH mature checkpoints are available.</p>
+  </section>
+
+  <section>
+    <h2>Next Actions</h2>
+    <ol>
+      <li>Keep AB through ep119 and likely ep139 unless it crashes.</li>
+      <li>Keep AF through ep59 to see whether cutmix-only remains ahead of AB after the early/mid phase.</li>
+      <li>Evaluate AH at ep19; if it is close to AF and better than AB ep19, continue to ep39.</li>
+      <li>Wait for Z ep39 to complete the full-augmentation K80 control.</li>
+      <li>Wait for S ep159 to quantify full-augmentation late catch-up.</li>
+      <li>Decide AG at ep39; if still behind AB/AF, stop K160 branch and reuse the slot.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

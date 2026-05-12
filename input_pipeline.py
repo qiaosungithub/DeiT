@@ -170,9 +170,6 @@ def apply_mixup_cutmix_batch(dataset_cfg, batch):
     )
 
   inputs, targets = batch
-  randperm = torch.randperm(inputs.size(0))
-  inputs = inputs[randperm]
-  targets = targets[randperm]
   
   # apply Mixup
   if mixup_fn is not None:

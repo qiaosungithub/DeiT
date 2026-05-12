@@ -3,129 +3,230 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DeiT Project Report Update (2026-05-10)</title>
+  <title>DeiT Masked Diffusion Auto Research Report — 2026-05-10</title>
   <style>
-    :root { --bg:#f7f8fa; --card:#fff; --text:#1f2937; --muted:#6b7280; --accent:#0f766e; --border:#e5e7eb; --warn:#b45309; --good:#166534; }
-    body { margin:0; font-family:"Segoe UI","PingFang SC","Noto Sans CJK SC",sans-serif; color:var(--text); background:linear-gradient(180deg,#eef6f5 0%,var(--bg) 260px); line-height:1.5; }
-    .wrap { max-width:1080px; margin:28px auto; padding:0 18px 40px; }
-    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,0.04); }
-    h1,h2,h3 { margin:0 0 10px; }
-    h1 { font-size:24px; }
-    h2 { font-size:18px; color:var(--accent); }
-    h3 { font-size:15px; }
-    p { margin:8px 0; }
-    ul { margin:8px 0 0 20px; }
-    li { margin:4px 0; }
-    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
-    th,td { border:1px solid var(--border); padding:8px; text-align:left; vertical-align:top; }
-    th { background:#f3f4f6; }
-    .good { color:var(--good); font-weight:600; }
-    .warn { color:var(--warn); font-weight:600; }
-    .muted { color:var(--muted); }
-    code { background:#f3f4f6; border-radius:6px; padding:1px 5px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; }
+    :root {
+      --bg: #f4f0e8;
+      --ink: #17211b;
+      --muted: #647067;
+      --card: #fffdf7;
+      --line: #ddd4c3;
+      --accent: #0f6b5f;
+      --accent2: #8a4f1d;
+      --good: #166534;
+      --bad: #9f1239;
+      --warn: #a16207;
+      --chip: #e8efe9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Aptos", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.55;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(15,107,95,.16), transparent 28rem),
+        linear-gradient(135deg, #f4f0e8 0%, #faf8f1 48%, #eef5f1 100%);
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 36px 18px 56px; }
+    header {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 30px;
+      background: rgba(255,253,247,.88);
+      box-shadow: 0 18px 50px rgba(54,44,30,.10);
+    }
+    h1, h2, h3 { line-height: 1.2; margin: 0 0 12px; }
+    h1 { font-size: clamp(28px, 4vw, 46px); letter-spacing: -.03em; }
+    h2 { font-size: 21px; color: var(--accent); margin-top: 2px; }
+    h3 { font-size: 16px; color: var(--accent2); }
+    p { margin: 8px 0; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; margin-top: 14px; }
+    .card {
+      grid-column: span 12;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px 20px;
+      background: rgba(255,253,247,.92);
+      box-shadow: 0 8px 24px rgba(54,44,30,.06);
+    }
+    .half { grid-column: span 6; }
+    .third { grid-column: span 4; }
+    .two { grid-column: span 8; }
+    .kpi { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .pill { background: var(--chip); border: 1px solid #d8e2da; border-radius: 999px; padding: 6px 10px; font-size: 13px; }
+    .good { color: var(--good); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .muted { color: var(--muted); }
+    code { background: #efe9dd; border: 1px solid #e2d8c7; border-radius: 6px; padding: 1px 5px; font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    th, td { border: 1px solid var(--line); padding: 8px 9px; text-align: left; vertical-align: top; }
+    th { background: #efe9dd; color: #332719; }
+    tr:nth-child(even) td { background: rgba(239,233,221,.25); }
+    .small { font-size: 13px; }
+    @media (max-width: 820px) { .half, .third, .two { grid-column: span 12; } header { padding: 22px; } }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
-      <h1>DeiT Report Update</h1>
-      <p><strong>Date:</strong> 2026-05-10</p>
-      <p><strong>Update scope:</strong> 按最新决策重规划（不走 warm-start / aux CE 主线），并确认 sanity run 状态与后续 4 天收尾路线。</p>
-    </div>
+    <header>
+      <h1>DeiT + Masked Diffusion Head Auto Research Report</h1>
+      <p><strong>生成时间:</strong> 2026-05-10 12:45 UTC</p>
+      <p><strong>范围:</strong> 整理上一个 agent 已完成的实现、实验、踩坑、当前状态，并给出接替后的下一步研究决策。</p>
+      <div class="kpi">
+        <span class="pill">Phase 1 best CE: <strong>73.14%</strong></span>
+        <span class="pill">当前 DeiT jobs: <strong>8/8 occupied</strong></span>
+        <span class="pill">当前最佳纯 diffusion: <strong>Run N ep119 59.06% / iter 62.80%</strong></span>
+        <span class="pill">后台 loop: <strong>active</strong></span>
+      </div>
+    </header>
 
-    <div class="card">
-      <h2>1. Sanity Run Status</h2>
-      <ul>
-        <li>Window: <code>6380</code>（tag: sanity-run full alignment, target 81.8%）。</li>
-        <li>Logdir: <code>/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260509_212142_mxfpdz_kmh-tpuvm-v6e-8-spot-gzy-favaxa_asia-northeast1-b__b_lr_ep_eval</code></li>
-        <li class="good">当前在持续训练中，不是挂起状态；最新日志时间到 2026-05-10 01:57 UTC，进度约 <strong>ep=43.56</strong>。</li>
-        <li>最近 eval: ep19=38.77%，ep39=54.47%。</li>
-      </ul>
-    </div>
+    <main class="grid">
+      <section class="card">
+        <h2>1. Research Goal</h2>
+        <p>项目目标是把 DeiT ImageNet 分类的标准 <code>1000-way logit head + CE loss</code> 替换为 <code>log2(N)</code> bit 表示的 masked diffusion head。ImageNet-1K 用 10 bits 表示类别，训练时随机 mask bit 并做 bit-wise CE，推理时从全 mask 做 single-step 或 iterative decoding。</p>
+        <ul>
+          <li>Phase 1: 复现 DeiT-Base baseline，目标 paper 81.8% top-1。</li>
+          <li>Phase 2: 实现 masked diffusion head，验证纯 diffusion classification 是否可行，并 ablate head 结构、mask schedule、sampling steps、训练长度与增强正则。</li>
+        </ul>
+      </section>
 
-    <div class="card">
-      <h2>2. 用户最新策略决策</h2>
-      <ul>
-        <li><strong>主线保持纯 diffusion</strong>：不把 warm-start backbone 和 aux CE 作为当前主方向。</li>
-        <li><strong>Ablation 1（最高优先级）</strong>：<code>n_masks_per_image=10</code>，单图一次 backbone forward，复用 CLS 训练 10 个 mask。</li>
-        <li><strong>Ablation 2</strong>：在去掉 mixup/cutmix 的 baseline 上，继续下调增强和正则（例如 wd / stochastic depth / randaugment / reprob / repeated aug）。</li>
-        <li><strong>Eval-only trick（后置）</strong>：多次生成 + majority vote。</li>
-      </ul>
-    </div>
+      <section class="card half">
+        <h2>2. Codebase State</h2>
+        <ul>
+          <li>框架是 <strong>JAX + Flax + Optax</strong>，不是 PyTorch。</li>
+          <li>模型主文件: <code>models.py</code>，训练主文件: <code>train.py</code>，配置: <code>configs/default.py</code> 与 <code>configs/remote_run*.yml</code>。</li>
+          <li>入口: <code>main.py</code> 调用 <code>train.train_and_evaluate()</code>。</li>
+          <li>数据路径: <code>/kmh-nfs-ssd-us-mount/data/imagenet</code>，启动后会按 TPU 区域缓存到本地共享内存。</li>
+          <li>当前工作区包含未提交改动；没有回滚任何上个 agent 或用户改动。</li>
+        </ul>
+      </section>
 
-    <div class="card">
-      <h2>3. 技术问题：Mask Ratio 下 Loss 求和还是平均</h2>
-      <p>当前实现（<code>masked_diffusion_loss</code>）是：对所有 masked token 的 CE 求和后，除以 masked token 总数（token-level mean）。</p>
-      <ul>
-        <li>形式：<code>L = sum_i sum_j m_ij * CE_ij / (sum_i sum_j m_ij)</code>。</li>
-        <li>效果：每个 masked token 权重相同；高 mask-ratio 样本因为 masked token 更多，整体贡献更大。</li>
-      </ul>
-      <p>可选替代：先做每样本 masked mean，再对 batch 平均（sample-level mean）。</p>
-      <ul>
-        <li>形式：<code>L = mean_i [ sum_j m_ij * CE_ij / max(sum_j m_ij,1) ]</code>。</li>
-        <li>效果：每个样本权重相同；但低 mask 样本会被相对放大，方差更大。</li>
-      </ul>
-      <p><strong>建议：</strong>先保留 token-level mean 作为主线（更稳，和常见 masked objective 一致），并把 sample-level mean 作为一个独立 ablation 开关验证。</p>
-    </div>
+      <section class="card half">
+        <h2>3. Operational Rules</h2>
+        <ul>
+          <li>每次 loop 必须完整读取 <code>agents/</code> 下所有文件，尤其是 <code>notes.md</code>。</li>
+          <li>DeiT 同时运行任务上限为 <strong>8</strong> 个；当前已满。</li>
+          <li>只使用 <code>v5p &lt;= 64</code> 或 <code>v6e &lt;= 32</code>；用户偏好优先 <code>v6e-16</code> / <code>v5p-32</code>，没有时可用更小卡。</li>
+          <li>preemption 交给 TPU manager 自动 resume，不要改 <code>MONITOR.py</code>。</li>
+          <li><code>tpu run</code> 必须带 <code>dir=7</code>。</li>
+        </ul>
+      </section>
 
-    <div class="card">
-      <h2>4. K=10 多 Mask 的资源判断（粗估）</h2>
-      <ul>
-        <li>对 ViT-B + 2-layer diffusion head（dim=256）做数量级估算：<code>backbone:head</code> 激活量约 <strong>437:1</strong>，FLOPs 约 <strong>1000:1</strong>。</li>
-        <li>结论：K=10 主要放大的是小 head，整体仍由 backbone 主导，理论上可行。</li>
-        <li>执行策略：默认 K=10；若实测 OOM，降到 K=6，再降到 K=4。</li>
-      </ul>
-    </div>
+      <section class="card">
+        <h2>4. Phase 1 Baseline Reproduction</h2>
+        <table>
+          <thead><tr><th>Run</th><th>Architecture</th><th>Final / Best</th><th>Conclusion</th></tr></thead>
+          <tbody>
+            <tr><td>Run 1</td><td>No qkv/ln biases + LearnedScale</td><td>71.956%</td><td>能稳定学习，但低于目标。</td></tr>
+            <tr><td>Run 2</td><td>DeiT-like biases + no LearnedScale</td><td>65.958%</td><td>明显 plateau，说明当前训练设置下 LearnedScale 很关键。</td></tr>
+            <tr><td>Run 3</td><td>Biases + LearnedScale</td><td><strong>73.140%</strong></td><td>Phase 1 最强，作为 warm-start Run I backbone 来源。</td></tr>
+          </tbody>
+        </table>
+        <p class="warn">Phase 1 没达到 81.8%，但完成了架构差异定位：当前 codebase 中 LearnedScale 对收敛非常重要，biases 进一步提升结果。</p>
+      </section>
 
-    <div class="card">
-      <h2>5. 配置对齐原则（按 sanity run）</h2>
-      <ul>
-        <li>diffusion 配置默认继承 sanity 的优化训练范式（尤其是 lr schedule、WD mask、稳定初始化）。</li>
-        <li>与 sanity 的差异只保留 diffusion 必需项：<code>use_mixup_cutmix=false</code>，以及可控的增强/正则下调分支。</li>
-        <li>建议先统一把 diffusion 的 <code>adamw_b2</code> 固定为 <code>0.95</code>，避免额外变量。</li>
-      </ul>
-    </div>
+      <section class="card two">
+        <h2>5. Phase 2 Implemented Features</h2>
+        <ul>
+          <li><strong>Masked diffusion label encoding:</strong> <code>class_to_bits</code> / <code>bits_to_class</code>，10-bit LSB-first 类别编码。</li>
+          <li><strong>Diffusion loss:</strong> masked positions 上做 bit-wise CE，默认 token-level mean。</li>
+          <li><strong>Eval:</strong> 同时记录 single-step all-mask accuracy、iterative decoding accuracy、invalid code rate。</li>
+          <li><strong>Mask schedule:</strong> 支持 <code>uniform</code> 与 <code>logit_normal</code>。</li>
+          <li><strong>Mixup fix:</strong> diffusion 训练关闭 mixup/cutmix，避免混合图像被 argmax 成单标签 bit 的监督噪声。</li>
+          <li><strong>Aux CE branch:</strong> 可选 <code>head_aux_ce</code> + <code>aux_ce_loss_weight</code>，用于诊断 CE 监督是否帮助 backbone。</li>
+          <li><strong>Backbone warm-start:</strong> <code>load_backbone_from</code>，从 Phase 1 checkpoint 复制非 head 参数，优化器重新初始化。</li>
+          <li><strong>K-mask CLS reuse:</strong> <code>n_masks_per_image</code>，每张图只 encode 一次，重复 K 个 mask 训练 head。</li>
+          <li><strong>Tiny-bit MLP head:</strong> bit embedding 缩到 8 维，CLS decoder MLP hidden 默认 3072。</li>
+          <li><strong>Cross-attention head:</strong> bit queries 对全 token memory（CLS + patch tokens）做 cross-attention。</li>
+        </ul>
+      </section>
 
-    <div class="card">
-      <h2>6. 4-Day Revised Plan</h2>
-      <table>
-        <thead>
-          <tr><th>Day</th><th>动作</th><th>验收标准</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>D1</td>
-            <td>继续确保 sanity run 稳定推进；实现 K=10 multi-mask（含 OOM fallback 逻辑）。</td>
-            <td>代码可跑，吞吐/显存可记录，loss 下降速度优于 K=1 baseline。</td>
-          </tr>
-          <tr>
-            <td>D2</td>
-            <td>启动 Ablation-1：K=10 主线；并行 K=1 对照。</td>
-            <td>同等 epoch 下 train/eval 曲线有明确提速证据。</td>
-          </tr>
-          <tr>
-            <td>D3</td>
-            <td>启动 Ablation-2：低增强/低正则版本（去 RA、降 wd、降 sd）。</td>
-            <td>观察 early/mid epoch 是否刷点，且不过拟合过快。</td>
-          </tr>
-          <tr>
-            <td>D4</td>
-            <td>做 eval-only majority vote（多次采样投票）并出最终结论。</td>
-            <td>评估耗时可控，精度提升可复现。</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <section class="card third">
+        <h2>6. Critical Bugs Fixed</h2>
+        <ul>
+          <li><code>class ViT(nn.Module)</code> 曾被误删，已恢复。</li>
+          <li>diffusion config 曾错误保留 <code>use_mixup_cutmix: true</code>，已改为 false。</li>
+          <li><code>ViT_base_mdh_mlp</code> 曾被误删，已恢复。</li>
+          <li>aux CE 的 <code>fc</code> 在 init 时未被调用导致参数缺失，已修。</li>
+          <li><code>load_backbone_params</code> 处理 checkpoint tree / FrozenDict 类型不匹配，已修。</li>
+          <li>Run E/G/I 曾用错 MLP config，已 kill 并重拉正确版本。</li>
+          <li>Run L resume 曾因重复 <code>--config.load_from</code> 报错，已清理并干净重启。</li>
+        </ul>
+      </section>
 
-    <div class="card">
-      <h2>7. 额外 Brainstorm（低侵入、可快速验证）</h2>
-      <ul>
-        <li>iterative decode 的 step 数搜索（4/6/8）+ 固定解 mask 数 schedule。</li>
-        <li>loss reweight by mask-ratio（例如限制极端 t 权重）以降低训练方差。</li>
-        <li>invalid code 约束解码（对 1000..1023 做 reject/resample）用于 eval-only 刷点。</li>
-      </ul>
-      <p class="muted">Report file: <code>agents/report_takeover_2026-05-10.html</code></p>
-    </div>
+      <section class="card">
+        <h2>7. Phase 2 Experiment Summary</h2>
+        <table>
+          <thead><tr><th>Run</th><th>Design</th><th>Key Result</th><th>Readout</th></tr></thead>
+          <tbody>
+            <tr><td>A/B</td><td>Early baseline, old code with mixup issue / b2 ablation</td><td>A ep179 37.25%; B ep39 0.52%</td><td>有学习信号，但监督噪声和 protocol 问题严重。</td></tr>
+            <tr><td>C</td><td>No mixup, uniform schedule</td><td>ep119 33.28% / iter 39.14%</td><td>确认 no-mixup fix 显著有效。</td></tr>
+            <tr><td>D</td><td>No mixup, logit-normal schedule</td><td>ep119 28.72% / iter 34.98%</td><td>落后 uniform，后续默认 uniform。</td></tr>
+            <tr><td>E</td><td>Zero-init projection</td><td>ep139 1.33% / iter 3.17%</td><td>明显失败，zero-init 过慢，不应作为主线。</td></tr>
+            <tr><td>G</td><td>Large attention head, 512 dim / 4L</td><td>ep139 2.95% / iter 6.64%</td><td>加大旧 attention head 不解决问题。</td></tr>
+            <tr><td>H</td><td>Attention + aux CE 0.1</td><td>ep139 52.51% / iter 54.82%</td><td>CE 监督强力帮助，但用户不希望主线“投敌”。</td></tr>
+            <tr><td>I</td><td>Warm-start backbone + diffusion head</td><td>ep139 58.99% / iter 62.47%</td><td>warm backbone 最强之一，但不是当前纯从零主线。</td></tr>
+            <tr><td>L</td><td>Cross-attn full tokens + K10</td><td>ep0 0.10% / iter 0.116%; currently ep~3</td><td>刚干净重启，需等 ep19/39。</td></tr>
+            <tr><td>M</td><td>Tiny-bit MLP + K10</td><td>ep79 51.19% / iter 56.40%</td><td>K10 + MLP 结构有效，明显强于旧纯 diffusion。</td></tr>
+            <tr><td>N</td><td>Tiny-bit MLP + K10 + low-aug mild</td><td><strong>ep119 59.06% / iter 62.80%</strong></td><td>当前最佳纯 diffusion 路线；低增强/正则有效。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>8. Current Active Jobs</h2>
+        <table>
+          <thead><tr><th>Window</th><th>Run</th><th>TPU</th><th>Status / Latest Eval</th></tr></thead>
+          <tbody>
+            <tr><td>6380</td><td>Sanity CE full alignment</td><td>favaxa</td><td>Running ep~145.8; ep139 = 63.356% CE.</td></tr>
+            <tr><td>6381</td><td>Run H aux CE</td><td>qxxa8y</td><td>Running ep~148.1; ep139 = 52.506% / iter 54.816%.</td></tr>
+            <tr><td>6382</td><td>Run E zero-init</td><td>axuxm0</td><td>Running ep~146; ep139 = 1.326% / iter 3.172%.</td></tr>
+            <tr><td>6383</td><td>Run G large head</td><td>06q7u9</td><td>Running ep~145; ep139 = 2.952% / iter 6.636%.</td></tr>
+            <tr><td>6388</td><td>Run I warm-start</td><td>j3rqvs</td><td>Running ep~141; ep139 = 58.986% / iter 62.470%.</td></tr>
+            <tr><td>6390</td><td>Run M tiny-bit MLP K10</td><td>cz2ivo</td><td>Running ep~98; latest eval ep79 = 51.186% / iter 56.400%.</td></tr>
+            <tr><td>6392</td><td>Run N tiny-bit MLP K10 low-aug</td><td>3djlis</td><td>Running ep~121; ep119 = 59.060% / iter 62.800%.</td></tr>
+            <tr><td>6405</td><td>Run L cross-attn K10</td><td>z169mq</td><td>tpu check shows Unknown, but output.log is updating at ep~3.8; ep0 = 0.100% / iter 0.116%.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card half">
+        <h2>9. Interpretation</h2>
+        <ul>
+          <li><strong>Pure diffusion is viable:</strong> Run N 已经在 ep119 达到 59.06% / iterative 62.80%，不再是“训不动”。</li>
+          <li><strong>K10 multi-mask 是高 ROI:</strong> Run M/N 早期曲线远强于旧 C/D/E/G，说明增加每图 mask 监督密度有效。</li>
+          <li><strong>Low augmentation helps:</strong> Run N 明显领先 Run M，说明 diffusion head 对过强 augmentation/regularization 更敏感。</li>
+          <li><strong>旧 attention head 路线弱:</strong> E/G 在 ep139 仍很低，继续堆旧 head 容量价值不高。</li>
+          <li><strong>Aux CE / warm-start 是强 diagnostic:</strong> H/I 说明 backbone 语义质量是瓶颈，但按用户决策不作为当前主线。</li>
+        </ul>
+      </section>
+
+      <section class="card half">
+        <h2>10. Next Research Decisions</h2>
+        <ul>
+          <li>当前 8/8 slots 已满，不 launch 新 job。</li>
+          <li>等 Run M/N 到 ep139/159，确认 low-aug 是否继续扩大优势。</li>
+          <li>等 Run L 到 ep19/39，判断 cross-attn full tokens 是否值得保留。</li>
+          <li>若需要释放 slot，优先考虑停止 E 或 G；它们已明显低 ROI。</li>
+          <li>下一批高优先级：Run N aggressive low-aug/low-reg、K10 sample-mean loss、K>10 或 K schedule、eval-only majority vote。</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>11. Takeover Actions Performed</h2>
+        <ul>
+          <li>完整读取了 <code>agents/</code> 下所有文件，包括 notes/results/idea/experiments/rethink/status/report/loop script/log。</li>
+          <li>检查了当前 TPU 状态，确认 DeiT 8 个窗口占满；7 个显示 Running，6405 在 tpu check 中为 Unknown 但 output.log 持续更新，因此无需 resume 或 launch。</li>
+          <li>读取了 8 个 active logdir，并提取最新 eval 结果。</li>
+          <li>将本 report 重写为完整交接版，覆盖上个 agent 的主要实现、实验、故障与当前判断。</li>
+          <li>后台 30 分钟 loop 保持运行，并已升级为每轮记录 job snapshot 与最新 eval 摘要。</li>
+        </ul>
+      </section>
+    </main>
   </div>
 </body>
 </html>

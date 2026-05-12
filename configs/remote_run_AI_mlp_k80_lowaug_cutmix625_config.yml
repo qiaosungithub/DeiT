@@ -1,7 +1,7 @@
-# Phase 2 Run AK: tiny-bit MLP K80 + RandAugment + random erasing medium augmentation + corrected mixup/cutmix soft_top2
-# Purpose: extend AJ by adding random erasing, while still avoiding repeated_aug=3 and stronger WD/SD.
-# This isolates whether RA/reprob image augmentation can help late generalization without full-aug's severe slow convergence.
-# No warm-start, no aux CE, no CE shortcut.
+# Phase 2 Run AI: tiny-bit MLP K80 + low augmentation/reg + corrected cutmix-interpolation soft_top2
+# Purpose: AB p=0.5 is best mature; AH p=0.75 was better early but slightly worse by ep159; AF p=1.0 is dominated.
+# This tests the interpolation point p=0.625 while keeping all AB/AH hyperparameters fixed.
+# No warm-start, no load_backbone_from, no aux CE, no CE shortcut.
 
 model: ViT_base_mdh_mlp
 load_from: ''
@@ -11,13 +11,13 @@ dataset:
     num_workers: 16
     prefetch_factor: 4
 
-    use_rand_augment: true
+    use_rand_augment: false
     rand_augment: rand-m9-mstd0.5-inc1
-    reprob: 0.25
+    reprob: 0.0
 
     use_mixup_cutmix: true
     mixup_prob: 1.0
-    switch_prob: 0.5
+    switch_prob: 0.625
     mixup_alpha: 0.8
     cutmix_alpha: 1.0
 
@@ -55,14 +55,13 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
-    wandb_notes: 'deit phase2 Run AK: MLP K80 RandAug+reprob + corrected mixup/cutmix soft_top2; no CE shortcut'
+    wandb_notes: 'deit phase2 Run AI: MLP K80 low-aug + corrected cutmix/mixup p=0.625 soft_top2; no CE shortcut'
     wandb_tags:
         - sqa
         - phase2
         - mlp-head
         - tiny-bit
         - k80
-        - randaug-reprob
-        - medium-aug
-        - mixup-cutmix-soft-top2
+        - low-aug
+        - cutmix625-soft-top2
         - no-ce-shortcut
