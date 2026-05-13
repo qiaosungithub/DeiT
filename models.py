@@ -62,13 +62,15 @@ class Layer(nn.Module):
     use_qkv_bias: bool = False
     use_ln_bias: bool = False
     use_layer_scale: bool = True
+    gelu_approximate: bool = False
 
     def setup(self):
+        gelu = partial(nn.gelu, approximate=self.gelu_approximate)
         self.attn = Attention(self.head, self.dim, self.attn_dim, use_bias=self.use_qkv_bias)
         self.ln1 = nn.LayerNorm(use_bias=self.use_ln_bias, use_scale=True, scale_init=nn.initializers.ones)
         self.mlp = nn.Sequential([
             special_linear(self.linear_dim),
-            GELU,
+            gelu,
             special_linear(self.dim)
         ])
         self.ln2 = nn.LayerNorm(use_bias=self.use_ln_bias, use_scale=True, scale_init=nn.initializers.ones)
@@ -277,6 +279,7 @@ class ViT(nn.Module):
     head_mlp_hidden_dim: int = 3072
     head_mlp_activation: str = 'gelu'
     head_mlp_layer_norm: bool = False
+    gelu_approximate: bool = False
     head_n_layers: int = 2
     head_n_heads: int = 4
     head_type: str = 'attention'   # 'attention' | 'mlp'
@@ -306,7 +309,8 @@ class ViT(nn.Module):
                              stochastic_depth_rate=self.stochastic_depth_rate * i / sd_scale,
                              use_qkv_bias=self.use_qkv_bias,
                              use_ln_bias=self.use_ln_bias,
-                             use_layer_scale=self.use_layer_scale)
+                             use_layer_scale=self.use_layer_scale,
+                             gelu_approximate=self.gelu_approximate)
                        for i in range(n_layers)]
         self.final_ln = nn.LayerNorm(use_scale=True, use_bias=self.use_ln_bias, scale_init=nn.initializers.ones)
         if not self.use_diffusion_head:

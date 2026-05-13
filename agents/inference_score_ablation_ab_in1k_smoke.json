@@ -1,0 +1,31 @@
+{
+  "batch_size": 16,
+  "config_mode": "remote_run_AB_mlp_k80_lowaug_mixlabel",
+  "elapsed_sec": 32.943620681762695,
+  "load_from": "/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval",
+  "max_examples": 128,
+  "methods": [
+    "all",
+    "lsb2",
+    "msb2",
+    "lsb4",
+    "msb4"
+  ],
+  "metrics": {
+    "all_top1": 0.921875,
+    "all_top5": 0.9375,
+    "greedy_iter4_invalid": 0.0,
+    "greedy_iter4_top1": 0.921875,
+    "greedy_single_invalid": 0.0,
+    "greedy_single_top1": 0.921875,
+    "lsb2_top1": 0.9375,
+    "lsb2_top5": 0.9765625,
+    "lsb4_top1": 0.9296875,
+    "lsb4_top5": 0.9921875,
+    "msb2_top1": 0.921875,
+    "msb2_top5": 0.96875,
+    "msb4_top1": 0.9296875,
+    "msb4_top5": 0.9765625
+  },
+  "n_valid": 128
+}

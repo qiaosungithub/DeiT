@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDH Inference Experiments Progress Report</title>
+  <style>
+    :root { --bg:#f5efe3; --paper:#fffaf1; --ink:#20241f; --muted:#647067; --line:#d7c8ad; --accent:#0b6b5d; --accent2:#9a4f0f; --good:#166534; --warn:#a16207; --code:#efe3cf; }
+    body { margin:0; color:var(--ink); font-family:"Aptos","Source Han Sans SC","PingFang SC",sans-serif; line-height:1.55; background:radial-gradient(circle at 0 0,rgba(11,107,93,.18),transparent 30rem),radial-gradient(circle at 100% 10%,rgba(154,79,15,.12),transparent 28rem),linear-gradient(140deg,#fbf4e7,#edf7f1 58%,#f8efdf); }
+    .wrap { max-width:1180px; margin:0 auto; padding:34px 18px 70px; }
+    .hero,.card { background:rgba(255,250,241,.96); border:1px solid var(--line); border-radius:18px; box-shadow:0 12px 34px rgba(71,52,24,.08); }
+    .hero { padding:26px 30px; margin-bottom:16px; }
+    .card { padding:18px 22px; margin:14px 0; }
+    h1 { margin:0 0 8px; font-size:34px; line-height:1.14; letter-spacing:-.02em; }
+    h2 { margin:0 0 10px; font-size:21px; color:var(--accent); }
+    p { margin:7px 0; }
+    ul { margin:8px 0 0 20px; padding:0; }
+    li { margin:4px 0; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+    th,td { border:1px solid var(--line); padding:8px 9px; text-align:left; vertical-align:top; }
+    th { background:#efe3cf; }
+    code { background:var(--code); border:1px solid #ddceb6; border-radius:6px; padding:1px 5px; font-family:"Cascadia Mono",Consolas,monospace; font-size:12px; }
+    pre { background:#202017; color:#fbf7e9; padding:14px; border-radius:12px; overflow:auto; font-size:12px; }
+    .good { color:var(--good); font-weight:700; }
+    .warn { color:var(--warn); font-weight:700; }
+    .muted { color:var(--muted); }
+  </style>
+</head>
+<body><div class="wrap">
+  <section class="hero">
+    <h1>MDH Inference Experiments: Progress Report</h1>
+    <p><strong>Generated:</strong> 2026-05-13 01:10 UTC. <strong>Checkpoint:</strong> Run AB ep319, ImageNet-1K validation, 50,000 images.</p>
+    <p><strong>Status:</strong> core inference-budget sweep is complete through 20 random one-bit paths. Best current top-5 is <span class="good">92.734%</span> using explicit 1000-class scoring with 10-step random20 rank aggregation.</p>
+  </section>
+
+  <section class="card">
+    <h2>1. Baseline Comparison</h2>
+    <p>Reference DeiT-B / DeiT-base patch16 224, no distillation, reports ImageNet-1K <strong>81.8%</strong> top-1 and <strong>95.6%</strong> top-5. Source: <a href="https://huggingface.co/facebook/deit-base-patch16-224">facebook/deit-base-patch16-224 model card</a>.</p>
+    <p>Our best current top-5 result is <code>78.868 / 92.734</code>, leaving a <code>2.866</code> point top-5 gap to DeiT-B. Best current top-1 observed is <code>78.916</code>, leaving a <code>2.884</code> point top-1 gap.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. Method</h2>
+    <p>Current training eval only did greedy all-mask bit argmax and 4-step confidence iterative decoding. The new evaluator explicitly scores all 1000 legal ImageNet class codes under fixed mask processes.</p>
+    <pre><code>log p_theta(y | x; path) = sum_t sum_{i in S_t} log p_theta(y_i | x, y_{U_{t-1}}, mask_t)
+U_{t-1} = S_1 union ... union S_{t-1}</code></pre>
+    <p>Because masked diffusion is path-dependent, we ablated all-mask scoring, 2/4 chunk paths, one-bit 10-step paths, random path ensembles, probability aggregation, and rank aggregation.</p>
+  </section>
+
+  <section class="card">
+    <h2>3. Best Method Implementation</h2>
+    <p>The best top-5 result uses <strong>20 random one-bit unmask paths + rankmean aggregation</strong>. It is implemented in <code>inference_score_ablation.py</code>; the key functions are <code>_chunks_for_method</code> and <code>_make_eval_step</code>.</p>
+    <table>
+      <tr><th>Component</th><th>Exact implementation</th></tr>
+      <tr><td>Checkpoint / model</td><td>Run AB ep319 checkpoint from <code>/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval</code>. Model config is <code>remote_run_AB_mlp_k80_lowaug_mixlabel</code>, i.e. <code>ViT_base_mdh_mlp</code> with a 10-bit MLP diffusion head.</td></tr>
+      <tr><td>Class codes</td><td>Only the 1000 legal ImageNet-1K classes are scored. Class labels are converted to binary with <code>models.class_to_bits(jnp.arange(1000))</code>. Bits are <strong>LSB first</strong>, matching training and <code>models.bits_to_class</code>.</td></tr>
+      <tr><td>Image preprocessing</td><td>Validation split uses the existing ImageNet eval pipeline: resize to <code>int(224 / 0.875) = 256</code>, center crop 224, convert to tensor, normalize with ImageNet mean/std. No augmentation or mixup is used at inference.</td></tr>
+      <tr><td>Backbone compute</td><td>For each image batch, the ViT backbone is run once to get the CLS feature: <code>model.encode(images, train=False)</code>. The CLS tensor is reused for all class-code scoring, so the expensive image encoder is not repeated per path.</td></tr>
+      <tr><td>Random paths</td><td>For each path <code>rand0 ... rand19</code>, create a deterministic random permutation of bit indices <code>0..9</code> using <code>jax.random.permutation(PRNGKey(seed), arange(10))</code>. Each path has 10 chunks, one bit per chunk, so it is a one-bit autoregressive unmask process.</td></tr>
+      <tr><td>Path scoring</td><td>Initialize <code>context</code> to all MASK tokens <code>2</code> with shape <code>(B, 1000, 10)</code>. For each bit chunk in the path, flatten to <code>(B*1000, 10)</code>, repeat CLS to <code>(B*1000, dim)</code>, call <code>model.decode_diffusion_from_cls(cls, masked_bits=context)</code>, take <code>log_softmax</code> over bit values, add the log-prob of each candidate class's true bit, then write that bit into <code>context</code>. This implements <code>sum_t log p(y_{S_t} | x, y_{U_{t-1}}, mask_t)</code>.</td></tr>
+      <tr><td>Per-path ranking</td><td>After each path has a score for all 1000 classes, sort classes descending by path score. Convert each class to a rank <code>0..999</code>, where rank 0 is best.</td></tr>
+      <tr><td>Rankmean aggregation</td><td>Average ranks across the 20 paths, then use <code>-mean_rank</code> as the final class score. The top-5 classes are the five highest <code>-mean_rank</code> values. This is calibration-light: it uses ordering from each path rather than trusting raw log-prob scale across paths.</td></tr>
+      <tr><td>Compute budget</td><td>Per image: one ViT encoder pass plus <code>20 * 10 = 200</code> MLP diffusion-head decode steps, vectorized over the 1000 legal class codes. Full 50k ImageNet-1K val with batch size 32 took <code>908.38s</code> on the local 4-core TPU setup.</td></tr>
+      <tr><td>Why no invalid-rate issue</td><td>The scorer never decodes arbitrary 10-bit outputs into the 1024-code space. It ranks only valid class ids <code>0..999</code>, so top-k candidates are always valid ImageNet classes.</td></tr>
+    </table>
+    <p>Exact command used for the best run:</p>
+    <pre><code>methods=$(python - &lt;&lt;'PY'
+print(','.join(f'rand{i}' for i in range(20)))
+PY
+)
+ensemble=$(python - &lt;&lt;'PY'
+print('+'.join(f'rand{i}' for i in range(20)))
+PY
+)
+python inference_score_ablation.py \
+  --load-from /kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval \
+  --batch-size 32 \
+  --max-examples 50000 \
+  --num-workers 0 \
+  --methods "$methods" \
+  --ensembles "$ensemble" \
+  --out agents/inference_score_ablation_ab_in1k_full_10step_20path_rank.json</code></pre>
+    <p>The output JSON field for the reported best number is <code>rand0_plus_..._plus_rand19_rankmean_top5 = 0.92734</code>, i.e. <code>92.734%</code>.</p>
+  </section>
+
+  <section class="card">
+    <h2>4. Full-Val Results</h2>
+    <table>
+      <tr><th>Method</th><th>Top-1</th><th>Top-5</th><th>Interpretation</th></tr>
+      <tr><td>Greedy single all-mask bit argmax</td><td>76.566</td><td>n/a</td><td>Old single-step top1; invalid rate 0.276%</td></tr>
+      <tr><td>Greedy 4-step confidence decode</td><td>78.336</td><td>n/a</td><td>Old iterative top1; invalid rate 0.004%</td></tr>
+      <tr><td>All-mask explicit 1000-class scoring</td><td>76.584</td><td>80.166</td><td>Valid class-code top5 exists, but all-mask probability is weak</td></tr>
+      <tr><td>LSB 2 chunks</td><td>78.600</td><td>85.768</td><td>Sequential scoring gives immediate top5 gain</td></tr>
+      <tr><td>LSB 4 chunks</td><td>78.796</td><td>89.636</td><td>Best single 4-chunk path</td></tr>
+      <tr><td>LSB4 + MSB4</td><td>78.866</td><td>90.126</td><td>Best 4-chunk ensemble</td></tr>
+      <tr><td>LSB 10 one-bit path</td><td>78.820</td><td>92.106</td><td>Granularity matters; top5 jumps above 92</td></tr>
+      <tr><td>LSB10 + MSB10</td><td>78.880</td><td>92.432</td><td>Best 2-path 10-step ensemble</td></tr>
+      <tr><td>5-path mean-log</td><td>78.896</td><td>92.502</td><td>Probability/product aggregation; strong top5</td></tr>
+      <tr><td>5-path logmeanexp</td><td><strong>78.914</strong></td><td>92.370</td><td>Natural latent-path marginal; best top1 among probability aggregations</td></tr>
+      <tr><td>5-path RRF</td><td>78.840</td><td>92.556</td><td>Rank aggregation beats probability aggregation for top5</td></tr>
+      <tr><td>10-random-path rankmean</td><td>78.860</td><td>92.684</td><td>Path count still helps, but slowly</td></tr>
+      <tr><td>20-random-path rankmean</td><td>78.868</td><td><strong>92.734</strong></td><td>Best current top5</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>5. Main Findings</h2>
+    <ul>
+      <li><strong>Explicit class scoring works:</strong> top5 improves from all-mask class scoring <code>80.166%</code> to <code>92.734%</code>, a <code>+12.568</code> point gain without training.</li>
+      <li><strong>Inference budget scales:</strong> best top5 improves from 4-step <code>90.126%</code> to 2-path 10-step <code>92.432%</code>, 5-path <code>92.556%</code>, 10-random <code>92.684%</code>, and 20-random <code>92.734%</code>.</li>
+      <li><strong>Returns are diminishing:</strong> 10-random to 20-random adds only <code>+0.050</code> top5, so blindly adding paths is no longer the best use of time.</li>
+      <li><strong>Path score calibration is imperfect:</strong> rankmean/RRF beats probability aggregation for top5; logmeanexp gives better top1 but lower top5.</li>
+      <li><strong>Top1 is saturated:</strong> best observed top1 is about <code>78.916%</code>, close to old iterative <code>78.336%</code> plus only <code>+0.58</code>.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>6. Artifacts</h2>
+    <table>
+      <tr><th>File</th><th>Content</th></tr>
+      <tr><td><code>inference_score_ablation.py</code></td><td>Inference-only evaluator implementing explicit class-code scoring and path/rank aggregations</td></tr>
+      <tr><td><code>agents/inference_score_ablation_ab_in1k_full.json</code></td><td>All-mask, 2-chunk, 4-chunk full-val results</td></tr>
+      <tr><td><code>agents/inference_score_ablation_ab_in1k_full_10step.json</code></td><td>2-path / 3-path one-bit 10-step results</td></tr>
+      <tr><td><code>agents/inference_score_ablation_ab_in1k_full_10step_5path_rank.json</code></td><td>5-path probability/rank aggregation results</td></tr>
+      <tr><td><code>agents/inference_score_ablation_ab_in1k_full_10step_12path_rank.json</code></td><td>12-path result, including random10 rankmean <code>92.684</code></td></tr>
+      <tr><td><code>agents/inference_score_ablation_ab_in1k_full_10step_20path_rank.json</code></td><td>20-random-path result, best top5 <code>92.734</code></td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>7. Recommended Next Step</h2>
+    <p>Do not keep blindly increasing random paths first. The next useful experiment is targeted candidate generation or calibration: use a cheaper decoder to propose a candidate pool, then apply explicit path scoring/rank aggregation only to that pool with more diverse paths or test-time augmentation. This should improve cost-effectiveness versus another raw 40-path full-class sweep.</p>
+  </section>
+</div></body></html>

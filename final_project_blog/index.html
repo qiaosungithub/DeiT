@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Masked Bit Classification</title>
+  <style>
+    :root {
+      --bg: #f7f7f2;
+      --ink: #18201d;
+      --muted: #5f6964;
+      --line: #d8ded8;
+      --panel: #ffffff;
+      --soft: #eef5f1;
+      --accent: #155e75;
+      --accent2: #7c3f16;
+      --warn: #8a4b09;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font: 16px/1.58 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { max-width: 1040px; margin: 0 auto; padding: 44px 20px 72px; }
+    header { margin-bottom: 28px; }
+    h1 { margin: 0 0 12px; font-size: clamp(34px, 6vw, 62px); line-height: 1.02; letter-spacing: 0; }
+    h2 { margin: 34px 0 12px; font-size: 26px; line-height: 1.18; color: var(--accent); }
+    h3 { margin: 22px 0 8px; font-size: 18px; color: var(--accent2); }
+    p { margin: 10px 0; }
+    a { color: var(--accent); }
+    .dek { max-width: 760px; color: var(--muted); font-size: 19px; }
+    .meta { color: var(--muted); font-size: 14px; }
+    .authors { color: var(--muted); font-size: 15px; margin-top: 4px; }
+    .callout {
+      margin: 18px 0;
+      padding: 14px 16px;
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+    }
+    .todo {
+      background: #fff7e8;
+      border-left-color: var(--warn);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 20px;
+      background: var(--panel);
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #edf3f4; }
+    caption {
+      caption-side: bottom;
+      color: var(--muted);
+      text-align: left;
+      padding-top: 6px;
+      font-size: 13px;
+    }
+    code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+      background: #eef1ef;
+      border: 1px solid #dde3df;
+      border-radius: 4px;
+      padding: 1px 4px;
+    }
+    .equation {
+      display: block;
+      padding: 13px 14px;
+      margin: 14px 0;
+      overflow-x: auto;
+      background: #f0f3f1;
+      border: 1px solid var(--line);
+      text-align: center;
+    }
+    math { font-size: 19px; }
+    .inline-math {
+      font-family: "Times New Roman", serif;
+      font-size: 1.04em;
+    }
+    ul { margin: 8px 0 0 22px; padding: 0; }
+    li { margin: 5px 0; }
+    figure { margin: 18px 0 24px; }
+    figure img {
+      width: 100%;
+      display: block;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    figcaption {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 7px;
+    }
+    .refs li { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="meta">6.8300 Computer Vision Final Project Draft</p>
+    <h1>Can a Classifier Stop Paying One Logit Per Class?</h1>
+    <p class="authors"><strong>Authors:</strong> Qiao Sun &lt;sqa24@mit.edu&gt;; Yiyin Zhu &lt;evazhu@mit.edu&gt;</p>
+    <p class="dek">Modern image classifiers almost universally terminate in a <strong>C-way logit head</strong>. This project challenges that default design. We replace the linear classifier over classes with a lightweight <strong>masked bit head</strong> that predicts a binary code for the label, reducing the output dimensionality from linear in C to logarithmic in C.</p>
+  </header>
+
+  <section>
+    <h2>Motivation</h2>
+    <p>The <strong>C-way linear classifier</strong> is one of the least questioned components in modern visual recognition. Given an image representation, the default choice is to apply a dense matrix and produce one scalar logit for every class. This design is simple, differentiable, and empirically strong; consequently, it is often treated as part of the definition of supervised classification rather than as a design choice.</p>
+    <p>From an <em>information-theoretic</em> perspective, however, identifying one label among C possibilities requires only <span class="inline-math">log<sub>2</sub> C</span> bits of information. A C-dimensional logit vector is therefore not a minimal description of the prediction. For example, an ImageNet-1K label can be represented by only 10 bits, while the conventional classifier emits 1000 floating-point logits. The distinction matters when the label space grows: the conventional head scales linearly in parameters, memory bandwidth, and output activations, while the number of bits needed to specify the answer grows only logarithmically.</p>
+    <p>This project asks whether the community's default practice can be relaxed. Instead of learning a direct map from visual features to C logits, we learn a map from visual features to the <strong>bits of the class identity</strong>. The resulting classifier is not intended to remove all costs associated with large label spaces; the representation still has to separate many visual categories. The narrower claim is that the final prediction head need not allocate one output channel per class.</p>
+    <div class="callout">
+      <strong>Research question.</strong> Can a discriminative vision model replace the standard C-way logit head with a masked bit prediction head whose output dimension is proportional to <span class="inline-math">ceil(log<sub>2</sub> C)</span>, while retaining meaningful classification accuracy?
+    </div>
+  </section>
+
+  <section>
+    <h2>Related Work</h2>
+    <h3>Discrete visual tokens and masked generation</h3>
+    <p>Discrete visual representation learning provides the closest technical context. VQ-VAE [2] introduced learned discrete latent codes; VQGAN [3] combined a convolutional tokenizer with a transformer prior for high-resolution synthesis; MaskGIT [4] replaced left-to-right token generation with iterative masked token prediction. These methods are generative rather than discriminative, but they expose the same output-space issue: a categorical head over a large discrete vocabulary scales with the vocabulary size.</p>
+    <p>Recent image generation work has explored alternatives to ordinary large-vocabulary token prediction. MAR [5] removes vector quantization and models continuous visual tokens using a diffusion loss conditioned on an autoregressive context. BAR [6] takes a complementary path: it keeps discrete tokens, but replaces the large token softmax with masked bit modeling. BAR shows that large codebooks can be made practical by predicting the binary representation of a token rather than scoring every codebook entry. Our method can be viewed as a discriminative analogue of this direction: the object to be generated is not an image token, but the discrete class identifier.</p>
+
+    <h3>Large-class classification</h3>
+    <p>Large-class recognition is often studied through pretraining rather than as an endpoint task. Big Transfer [7], ViT [8], and ImageNet-21K Pretraining for the Masses [9] all demonstrate that large supervised taxonomies produce transferable visual representations. Ridnik et al. [9] further analyze why direct classification on such taxonomies is difficult: single-label training is efficient but semantically inconsistent, multi-label training is more expressive but becomes an extreme multi-task problem, and semantic softmax uses the WordNet hierarchy to reduce this mismatch. Differentiable Top-k Classification Learning [10] optimizes ranking metrics directly on ImageNet-scale label spaces. These works improve training objectives or label semantics, but the output layer remains tied to the number of classes.</p>
+  </section>
+
+  <section>
+    <h2>Method</h2>
+    <h3>Label encoding and diffusion head</h3>
+    <p>Let <span class="inline-math">y in {0, ..., C - 1}</span> denote the class index. We encode the class as an LSB-first binary vector <span class="inline-math">b(y) in {0,1}<sup>B</sup></span>, where</p>
+    <div class="equation">
+      <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+        <mi>B</mi><mo>=</mo><mo>&lceil;</mo><msub><mi>log</mi><mn>2</mn></msub><mi>C</mi><mo>&rceil;</mo><mo>.</mo>
+      </math>
+    </div>
+    <p>The backbone first maps the image to a visual representation. The masked bit head is intentionally <strong>lightweight</strong>: for each bit position, the head receives one of three tokens, 0, 1, or MASK. A small learned embedding for these bit tokens is concatenated with the image CLS feature and passed through a two-layer GELU MLP. The output contains two logits per bit. Thus the head predicts <span class="inline-math">2B</span> scalar logits rather than C class logits. More expressive designs are possible, including a cross-attention block in which bit queries attend to image patch tokens. In our experiments, however, the naive MLP head was surprisingly strong and offered the best accuracy-compute tradeoff in the final recipe.</p>
+
+    <h3>Training objective</h3>
+    <p>Training follows the standard masked diffusion pattern, but the object being diffused is the class-bit vector rather than an image. For each training example, we sample a binary mask, replace the hidden bit positions by MASK tokens, and train a network <span class="inline-math">f<sub>theta</sub></span> to reconstruct the original bits:</p>
+    <div class="equation">
+      <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+        <mi>L</mi><mo>=</mo>
+        <mi>CE</mi>
+        <mo>(</mo>
+        <mi>b</mi><mo>,</mo>
+        <msub><mi>f</mi><mi>&#x03B8;</mi></msub>
+        <mo>(</mo><mi>I</mi><mo>,</mo><mi>b</mi><mo>&#x2299;</mo><mi>mask</mi><mo>)</mo>
+        <mo>)</mo><mo>.</mo>
+      </math>
+    </div>
+    <p>The cross-entropy is evaluated on the masked positions. This objective is deliberately close to masked image generation losses: the model sees a partially observed discrete object and predicts the missing entries. The difference is that the discrete object has only B bits, so the reconstruction head is small.</p>
+
+    <h3>Inference</h3>
+    <p>At inference time, the lowest-cost classifier starts from an all-MASK bit sequence and predicts every bit once. We also evaluate a 4-step confidence decoder: at each step the head predicts all currently masked positions, and the most confident subset is fixed before the next step. This is the discriminative analogue of iterative masked generation.</p>
+    <p>We also evaluate an explicit class-code scorer. Instead of generating one bit string, the scorer enumerates the legal class codes and assigns each class a path-dependent score by revealing bits sequentially and accumulating their log probabilities. This produces a real top-k ranking over the valid classes, but it is no longer the logarithmic-cost operating point: with P one-bit reveal paths, the scorer makes <span class="inline-math">P log<sub>2</sub>C</span> passes over C candidate codes. Each pass still uses the lightweight bit head. We use this setting to test whether additional inference compute can recover top-k accuracy.</p>
+
+    <h3>Efficient multi-mask training</h3>
+    <p>Diffusion-style training is often slower than ordinary classification because the model must learn many noise levels or mask patterns. A single image-label pair is not just one supervised example; it represents many possible partially masked bit strings. We exploit the fact that the image encoder is much more expensive than the bit head. For each image, the backbone is run once. The resulting feature is then repeated across K independently sampled bit masks, and only the lightweight head is evaluated K times.</p>
+    <p>This produces many masked-bit training samples while adding little memory pressure relative to another full image forward pass. In the final configuration, K = 80. The ablation below shows that increasing the number of mask samples per image forward substantially accelerates early learning.</p>
+
+    <h3>Mixup and CutMix supervision</h3>
+    <p>Mixup and CutMix produce soft labels. Collapsing those labels by argmax creates a mixed image with a single hard bit target, which is especially noisy for a bit-level objective. In the final recipe we use <code>soft_top2</code>: for each image we create K masked-bit samples, take the top two soft-label classes, and split the K samples between their bit codes in proportion to the mix weight. With K = 80 and a 50/50 CutMix sample, 40 masked-bit samples train toward one class and 40 toward the other.</p>
+  </section>
+
+  <section>
+    <h2>Experimental Setup</h2>
+    <p>On ImageNet-1K we trained DeiT-B variants with a masked bit head for 330 epochs, batch size 1024, AdamW, learning rate 5e-4, weight decay 0.02, stochastic depth 0.05, and no CE shortcut or backbone warm-start. We use DeiT-B [1] as a standard supervised ViT backbone; the experimental variable is the replacement of the terminal classifier head. The best configuration used <code>K=80</code>, uniform mask ratios, low augmentation, mixup alpha 0.8, CutMix alpha 1.0, switch probability 0.5, and <code>soft_top2</code> label allocation.</p>
+    <p>For ImageNet-1K inference, we evaluate both generated-label decoding and explicit scoring of all 1000 legal class codes on the full 50,000-image validation set. The strongest explicit scorer uses 20 random one-bit reveal paths and aggregates them by mean rank. On ImageNet-21K-P, we evaluate a 10,450-class processed split with 14-bit labels. <strong>[TODO: collaborator confirm ImageNet-21K-P split, checkpoint, and validation protocol before final submission.]</strong></p>
+  </section>
+
+  <section>
+    <h2>Main Results</h2>
+    <h3>ImageNet-1K</h3>
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Classes</th><th>Head / inference cost</th><th>Primary metric</th><th>Secondary metric</th><th>Comment</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>CoCa finetuned [11]</td><td>1,000</td><td>O(C) logits</td><td>Top-1: 91.0</td><td>not reported</td><td>SOTA</td></tr>
+        <tr><td>DeiT-B [1]</td><td>1,000</td><td>O(C) logits</td><td>Top-1: 81.8</td><td>Top-5: 95.6</td><td>baseline</td></tr>
+        <tr><td>Ours: generated-label decode</td><td>1,000</td><td>O(log C) head; O(4 log C) decode</td><td>78.34 iterative decode</td><td>n/a</td><td>low-cost</td></tr>
+        <tr><td>Ours: explicit class-code scoring</td><td>1,000</td><td>O(log C) head; 200C scoring passes</td><td>Top-1: 78.87</td><td>Top-5: 92.73</td><td>scored</td></tr>
+      </tbody>
+      <caption>Table 1. ImageNet-1K comparison. The low-cost decoder generates a single label; explicit class-code scoring ranks all legal labels and therefore supports standard top-k evaluation under the learned bit scorer.</caption>
+    </table>
+
+    <h3>ImageNet-21K-P</h3>
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Classes</th><th>Head / inference cost</th><th>Primary metric</th><th>Secondary metric</th><th>Comment</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Ridnik et al., TResNet-L single-label [9]</td><td>11,221</td><td>O(C)</td><td>Top-1: 45.5</td><td>Top-5: 75.6</td><td>published</td></tr>
+        <tr><td>Differentiable Top-k, DiffSortNets [10]</td><td>ImageNet-21K-P</td><td>O(C)</td><td>Top-1: 40.22</td><td>Top-5: 70.88</td><td>top-k loss</td></tr>
+        <tr><td>Ours: completed masked-bit model</td><td>10,450</td><td>O(log C) one-shot; O(5 log C) for 5-decode vote</td><td>41.89 single decode</td><td>50.35 5-decode vote</td><td>ours</td></tr>
+      </tbody>
+      <caption>Table 2. ImageNet-21K-P comparison. Conventional methods report standard top-1/top-5 accuracy; our secondary metric is generated-label vote accuracy.</caption>
+    </table>
+  </section>
+
+  <section>
+    <h2>Ablations</h2>
+    <p>All ablations in this section are conducted on ImageNet-1K.</p>
+    <h3>Training curve</h3>
+    <figure>
+      <img src="assets/best_training_curve.svg" alt="Masked-bit classifier learning curve on ImageNet-1K." />
+      <figcaption>Figure 1. Validation generated-label accuracy during training. The 4-step iterative decoder consistently improves over one-shot all-mask decoding and reaches about 78.3% at the final checkpoint.</figcaption>
+    </figure>
+
+    <h3>Number of mask samples per image forward</h3>
+    <figure>
+      <img src="assets/mask_samples_curve.svg" alt="Ablation curve for different numbers of mask samples per image forward." />
+      <figcaption>Figure 2. Representative validation curves for 1, 10, and 80 mask samples per image forward. The K=1 curve illustrates the cost of sparse mask supervision, while larger K values give the lightweight head many more reconstruction problems per image feature.</figcaption>
+    </figure>
+
+    <h3>Ablation on augmentation usage</h3>
+    <table>
+      <thead><tr><th>Matched epoch</th><th>Low augmentation, K=80</th><th>Full augmentation, K=80</th><th>Gap</th></tr></thead>
+      <tbody>
+        <tr><td>99</td><td>70.380 / 73.076</td><td>57.724 / 62.532</td><td>+12.656 / +10.544</td></tr>
+        <tr><td>119</td><td>71.886 / 74.052</td><td>60.146 / 64.446</td><td>+11.740 / +9.606</td></tr>
+        <tr><td>139</td><td>72.550 / 74.542</td><td>62.192 / 66.086</td><td>+10.358 / +8.456</td></tr>
+        <tr><td>159</td><td>73.496 / 75.538</td><td>63.456 / 67.114</td><td>+10.040 / +8.424</td></tr>
+        <tr><td>199</td><td>74.064 / 75.886</td><td>65.262 / 68.472</td><td>+8.802 / +7.414</td></tr>
+      </tbody>
+      <caption>Table 3. Full augmentation exhibits delayed improvement, but remains substantially below the low-augmentation recipe within the tested training horizon.</caption>
+    </table>
+
+    <h3>Inference-budget ablation</h3>
+    <table>
+      <thead><tr><th>Inference mode</th><th>Cost after image encoding</th><th>Top-1</th><th>Top-5</th><th>Takeaway</th></tr></thead>
+      <tbody>
+        <tr><td>Greedy all-mask generated label</td><td>1 head pass</td><td>76.57</td><td>n/a</td><td>fastest</td></tr>
+        <tr><td>4-step confidence generated label</td><td>4 head passes</td><td>78.34</td><td>n/a</td><td>low-cost best</td></tr>
+        <tr><td>All-mask explicit class scoring</td><td>1C scoring pass</td><td>76.58</td><td>80.17</td><td>weak ranking</td></tr>
+        <tr><td>4-chunk LSB class scoring</td><td>4C scoring passes</td><td>78.80</td><td>89.64</td><td>path helps</td></tr>
+        <tr><td>10-step LSB class scoring</td><td>10C scoring passes</td><td>78.82</td><td>92.11</td><td>granularity helps</td></tr>
+        <tr><td>5-path logmeanexp scoring</td><td>50C scoring passes</td><td><strong>78.91</strong></td><td>92.37</td><td>best top-1</td></tr>
+        <tr><td>20-random-path rankmean scoring</td><td>200C scoring passes</td><td>78.87</td><td><strong>92.73</strong></td><td>best top-5</td></tr>
+      </tbody>
+      <caption>Table 4. Inference-budget ablation on ImageNet-1K. C denotes the number of legal class codes; each scoring pass uses the same lightweight O(log C) bit head.</caption>
+    </table>
+  </section>
+
+  <section>
+    <h2>Future Directions</h2>
+    <p>The same principle can extend beyond image classification. Many vision tasks use large structured output spaces, but still train with dense discriminative losses. Semantic segmentation is a natural example: instead of predicting an independent cross-entropy distribution at every pixel, one could represent the segmentation mask as a discrete object and generate it with a diffusion-style decoder. This would move the model closer to structured mask generation, where spatial consistency is part of the output process rather than only a byproduct of the backbone.</p>
+    <p>Another direction is to replace ordinary binary class ids with learned or hierarchy-aware codes. Such codes could make nearby bit strings correspond to semantically nearby classes, reduce the cost of bit errors, and connect the logarithmic head more directly to the taxonomy of large recognition datasets.</p>
+  </section>
+
+  <section>
+    <h2>Limitations</h2>
+    <p>The masked-bit head is class-efficient, but it loses some conveniences of a standard logit head. A softmax classifier directly produces a normalized distribution over all classes. Our decoder instead produces one or several class codes. As a result, computing calibrated per-class probabilities is not immediate; it requires either additional scoring over candidate codes or an expensive pass over all valid class codes.</p>
+    <p>The binary code itself is also a modeling choice. In this implementation, class ids are encoded as ordinary binary integers, so nearby codes are not necessarily semantically related. This makes bit errors uneven: flipping a high-order bit can move the prediction to an unrelated class. In addition, when C is not a power of two, some bit strings are invalid class labels. The model learns to avoid most invalid codes, but the issue is absent in a conventional C-way head.</p>
+    <p>Finally, there is a tradeoff between logarithmic-cost decoding and top-k evaluation. Generated-label decoding preserves the intended low-cost inference path, but it does not rank every class. Explicit class-code scoring produces a standard top-k list over legal classes, but its cost scales with C because every candidate code is scored.</p>
+  </section>
+
+  <section>
+    <h2>Discussion</h2>
+    <p>The principal positive result is that a classifier can learn a nontrivial visual decision rule without a C-way logit head. The masked-bit head reaches 78.34% low-cost generated-label accuracy on ImageNet-1K, and explicit class-code scoring improves the same checkpoint to 78.87% top-1 and 92.73% top-5. The model also learns on a 10K-class ImageNet-21K-P split. This is a feasibility result for class-efficient output heads: the number of predicted output channels is 20 on ImageNet-1K and 28 on ImageNet-21K-P, rather than 1000 or 10,450.</p>
+    <p>The main limitation is that bit-factorized prediction is not yet a drop-in accuracy replacement for softmax classification. Accuracy remains below conventional classifiers, especially on ImageNet-1K. Some of this gap may be attributable to the unresolved DeiT reproduction gap in our codebase, but the ablations also indicate genuine modeling challenges.</p>
+    <p>The experiments also show that the masking protocol is central to the method. Early runs were weak when mixed images were supervised by hard argmax labels and evaluation used only all-mask single-step decoding. Correcting mixup/CutMix supervision, increasing the number of mask samples K, and using iterative decoding changed the method from a near-random baseline into a mature 76-78% ImageNet-1K classifier. This is consistent with the BAR result in generative modeling: masked bit prediction is effective only when training masks and inference schedules are treated as first-class components of the model.</p>
+    <p>The inference sweep clarifies where the method is strong. Extra scoring compute gives a large top-5 improvement, from 80.17% under all-mask class scoring to 92.73% under 20 random one-bit paths. Top-1 improves much less, from 78.34% low-cost iterative decoding to 78.91% under the best explicit scorer. This suggests that the model often assigns useful probability mass to the right neighborhood of labels, but its first choice remains the main bottleneck.</p>
+  </section>
+
+  <section>
+    <h2>References</h2>
+    <ul class="refs">
+      <li>[1] H. Touvron et al. <a href="https://arxiv.org/abs/2012.12877">Training Data-Efficient Image Transformers and Distillation through Attention</a>. ICML, 2021.</li>
+      <li>[2] A. van den Oord, O. Vinyals, and K. Kavukcuoglu. <a href="https://arxiv.org/abs/1711.00937">Neural Discrete Representation Learning</a>. NeurIPS, 2017.</li>
+      <li>[3] P. Esser, R. Rombach, and B. Ommer. <a href="https://arxiv.org/abs/2012.09841">Taming Transformers for High-Resolution Image Synthesis</a>. CVPR, 2021.</li>
+      <li>[4] H. Chang et al. <a href="https://arxiv.org/abs/2202.04200">MaskGIT: Masked Generative Image Transformer</a>. CVPR, 2022.</li>
+      <li>[5] T. Li, Y. Tian, H. Li, M. Deng, and K. He. <a href="https://arxiv.org/abs/2406.11838">Autoregressive Image Generation without Vector Quantization</a>. NeurIPS, 2024.</li>
+      <li>[6] Q. Yu et al. <a href="https://arxiv.org/abs/2602.09024">Autoregressive Image Generation with Masked Bit Modeling</a>. arXiv, 2026.</li>
+      <li>[7] A. Kolesnikov et al. <a href="https://arxiv.org/abs/1912.11370">Big Transfer: General Visual Representation Learning</a>. ECCV, 2020.</li>
+      <li>[8] A. Dosovitskiy et al. <a href="https://arxiv.org/abs/2010.11929">An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale</a>. ICLR, 2021.</li>
+      <li>[9] T. Ridnik et al. <a href="https://arxiv.org/abs/2104.10972">ImageNet-21K Pretraining for the Masses</a>. NeurIPS Datasets and Benchmarks, 2021.</li>
+      <li>[10] F. Petersen et al. <a href="https://proceedings.mlr.press/v162/petersen22a.html">Differentiable Top-k Classification Learning</a>. ICML, 2022.</li>
+      <li>[11] J. Yu et al. <a href="https://arxiv.org/abs/2205.01917">CoCa: Contrastive Captioners are Image-Text Foundation Models</a>. TMLR, 2022.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

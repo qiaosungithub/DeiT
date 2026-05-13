@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IN-21K-P Masked Diffusion Head Progress Report</title>
+  <style>
+    :root {
+      --bg: #f4ecdf;
+      --card: #fffdf6;
+      --ink: #1d2421;
+      --muted: #6a716a;
+      --line: #d6ccb8;
+      --accent: #0e6b66;
+      --accent2: #7a4a13;
+      --good: #166534;
+      --warn: #9a6500;
+      --bad: #9e2438;
+      --code: #ece3d1;
+    }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 5% 0, rgba(14, 107, 102, .14), transparent 30rem),
+        radial-gradient(circle at 95% 10%, rgba(122, 74, 19, .12), transparent 28rem),
+        linear-gradient(135deg, #f8f1e3, #ecf5f0 60%, #f9f3e7);
+      font-family: "Aptos", "Source Han Sans SC", "PingFang SC", sans-serif;
+      line-height: 1.55;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 34px 18px 64px; }
+    .hero, .card {
+      background: rgba(255, 253, 246, .95);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(60, 48, 22, .08);
+    }
+    .hero { padding: 24px 28px; margin-bottom: 16px; }
+    .card { padding: 18px 22px; margin: 14px 0; }
+    h1 { font-size: 32px; line-height: 1.18; margin: 0 0 8px; letter-spacing: -.02em; }
+    h2 { font-size: 21px; color: var(--accent); margin: 0 0 10px; }
+    h3 { font-size: 16px; color: var(--accent2); margin: 16px 0 8px; }
+    p { margin: 8px 0; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    th, td { border: 1px solid var(--line); padding: 8px 9px; text-align: left; vertical-align: top; }
+    th { background: #efe6d2; }
+    tr.best td { background: #e7f4ec; }
+    tr.warn-row td { background: #fbf3e0; }
+    tr.muted-row td { color: var(--muted); background: #f5efe2; }
+    code { background: var(--code); border: 1px solid #dccfb6; border-radius: 6px; padding: 1px 5px; font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+    pre { background: #1e1d16; color: #fbf6e9; padding: 14px; border-radius: 12px; overflow: auto; font-size: 12px; }
+    .good { color: var(--good); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .muted { color: var(--muted); }
+    .pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; margin: 2px 4px 2px 0; background: #f4eddb; font-size: 12px; }
+    .metric { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 14px 0; }
+    .small { font-size: 14px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <section class="hero">
+    <h1>IN-21K-P Masked Diffusion Head: Progress Report</h1>
+    <p><strong>Snapshot:</strong> 2026-05-12 (afternoon EDT). <strong>Dataset:</strong> ImageNet-21K-P winter21, 10,450 classes, 14 bits.</p>
+    <p><strong>Core outcome:</strong> Run AB recipe is ported and validated; MBM at K=80 + mixup/cutmix + soft_top2 is currently at <span class="metric">36.21%</span> single-step top-1 / <span class="metric">47.07%</span> top-5 at epoch 12 of 30, with healthy ~0.5pp/epoch growth. Linear extrapolation to ep30 lands at <strong>~45-50%</strong>, consistent with the collaborator's reported IN-1K trajectory adjusted for 10× more classes / 8× fewer per-class samples.</p>
+    <p><span class="pill">No CE warm-start</span><span class="pill">No <code>load_backbone_from</code></span><span class="pill">No aux CE</span><span class="pill">LSB bit order</span><span class="pill">soft_top2 labels</span></p>
+  </section>
+
+  <section class="card">
+    <h2>1. Executive Summary</h2>
+    <ul>
+      <li><strong>Recipe alignment:</strong> Run AB ported faithfully — K=80 multi-mask, mixup_alpha=0.8 / cutmix_alpha=1.0 / switch_prob=0.5 / mixup_prob=1.0, soft_top2 view allocation, GELU MLP head (bit_dim=8, hidden=3072, 2-layer, zero-init output), AdamW b2=0.95, lr=5e-4, wd=0.02, stochastic depth=0.05, label smoothing=0.1, low augmentation. CPU smoke test verified all paths (loss ≈ log 2 = zero-init signature).</li>
+      <li><strong>Best result so far:</strong> Run AB at ep12 reads <strong>36.21% / 47.07%</strong> single-step / top-5. The curve is monotone and consistent (ep9 → 12: 34.72 → 35.00 → 35.82 → 36.21). No iterative-decode eval yet — training-time eval reports 4-step iterative; that number will land in the final eval pass.</li>
+      <li><strong>Ablation point (K=10, Run N recipe):</strong> 817685 at ep17 reads 39.71% / 50.13%. Slightly ahead of Run AB on absolute number, but on fewer-parameter-update trajectory (no mixup, smaller K). Useful as a K-ablation reference.</li>
+      <li><strong>Standard CE baseline:</strong> pre-crash ep28 best is 48.68% / 79.01%. Effectively converged (Δ0.02 from ep27 → 28).</li>
+      <li><strong>Semantic baseline (Ridnik):</strong> severely under-trained at ep5 (5.8% top-1) due to repeated preemption on <code>csail-shared-h200</code>. Reported as a lower bound, not a converged baseline.</li>
+      <li><strong>Cluster context:</strong> 5月 finals week on CSAIL is brutal; jobs sat in queue ~24h on <code>shared-if-available</code> QoS before starting. <code>vision-pulkitag-h200</code> is fully booked by lab members. All four jobs are now in flight.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>2. Current Results</h2>
+    <table>
+      <tr><th>Head</th><th>Job</th><th>Recipe</th><th>Epoch</th><th>top-1</th><th>top-5</th><th>Status</th></tr>
+      <tr class="best">
+        <td><strong>MBM Run AB</strong></td>
+        <td>822746</td>
+        <td>K=80 + mixup/cutmix soft_top2 + low aug<br><span class="small">collaborator's recipe</span></td>
+        <td>12 / 30</td>
+        <td><strong>36.21%</strong> ↑</td>
+        <td>47.07%</td>
+        <td><span class="good">Running</span>, healthy</td>
+      </tr>
+      <tr>
+        <td>MBM K=10 (Run N)</td>
+        <td>817685</td>
+        <td>K=10, no mixup<br><span class="small">earlier baseline recipe, kept as ablation</span></td>
+        <td>17 / 30</td>
+        <td>39.71%</td>
+        <td>50.13%</td>
+        <td><span class="good">Running</span></td>
+      </tr>
+      <tr>
+        <td>Standard CE</td>
+        <td>817683</td>
+        <td>standard softmax + RandAug + label_smooth=0.2<br><span class="small">baseline recipe, pre-existing</span></td>
+        <td>28 / 30 (best)</td>
+        <td>48.68%</td>
+        <td>79.01%</td>
+        <td><span class="good">Running</span> resume; ~converged</td>
+      </tr>
+      <tr class="warn-row">
+        <td>Semantic (Ridnik)</td>
+        <td>817684</td>
+        <td>WordNet hierarchy multi-level softmax</td>
+        <td>5 / 30</td>
+        <td>5.8%</td>
+        <td>12.6%</td>
+        <td><span class="warn">Severely under-trained</span> (preempt)</td>
+      </tr>
+      <tr class="muted-row">
+        <td>MBM cross-attn (historical)</td>
+        <td>798148</td>
+        <td>4-layer cross-attn head, K=1, full aug<br><span class="small">earlier head architecture, retired</span></td>
+        <td>28 (final)</td>
+        <td>41.89%</td>
+        <td>50.35%</td>
+        <td>Finished, ablation only</td>
+      </tr>
+    </table>
+    <p class="small">Top-1 above is training-time eval (4-step iterative for MBM, single-pass for CE/semantic). A final evaluation pass with the full 4-strategy top-5 sweep and explicit invalid_rate will run after MBM Run AB reaches ep30.</p>
+  </section>
+
+  <section class="card">
+    <h2>3. MBM Run AB Learning Curve</h2>
+    <table>
+      <tr><th>Epoch</th><th>train_loss</th><th>single-step top-1</th><th>top-5</th><th>Read</th></tr>
+      <tr><td>9</td><td>0.4704</td><td>34.72%</td><td>45.94%</td><td>First epoch with stable val numbers post-warmup.</td></tr>
+      <tr><td>10</td><td>0.4679</td><td>35.00%</td><td>46.09%</td><td>+0.28 pp.</td></tr>
+      <tr><td>11</td><td>0.4658</td><td>35.82%</td><td>46.80%</td><td>+0.82 pp, acceleration visible.</td></tr>
+      <tr><td>12</td><td>0.4629</td><td><strong>36.21%</strong></td><td>47.07%</td><td>Latest; ~0.5 pp/epoch sustained.</td></tr>
+    </table>
+    <p>Linear extrapolation: at ep30 the curve lands near <strong>45-50% top-1</strong>. With cosine LR decay and the typical late-training plateau, <strong>~47%</strong> is the best guess for the converged Run AB top-1 on this budget. Iterative-decode eval (4-step) typically adds <strong>+2 pp</strong> over single-step on this architecture (cf. partial eval on the retired cross-attn head: 42.70% iterative vs 36% single-step at K=16 inference).</p>
+    <p class="small">Note: this is the training-time eval, which uses 4-step iterative as the canonical inference path on this recipe (per <code>--mbm_inference_steps=4</code>, matching Run AB's 4-step schedule). Final report will also include 1-step / single-step numbers and the 4-strategy top-5 sweep.</p>
+  </section>
+
+  <section class="card">
+    <h2>4. Setup Confirmation Against Run AB</h2>
+    <p>Verified component-by-component against the 2026-05-11 / 2026-05-12 collaborator handoff documents.</p>
+    <table>
+      <tr><th>Component</th><th>Run AB value</th><th>IN-21K-P value</th><th>Match</th></tr>
+      <tr><td>Head architecture</td><td>MLP, bit_dim=8, hidden=3072, 2-layer GELU, no LayerNorm</td><td>same</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Output linear init</td><td>zero-init</td><td>zero-init (verified: smoke loss = log 2)</td><td><span class="good">✓</span></td></tr>
+      <tr><td>K (masks per image)</td><td>80</td><td>80</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Label allocation</td><td>soft_top2</td><td>soft_top2 (round-to-integer view counts)</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Mixup / CutMix</td><td>α=0.8 / α=1.0, prob=1.0, switch=0.5</td><td>same</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Augmentation</td><td>low: no RandAug, no random erasing, repeated_aug=1</td><td>same</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Optimizer</td><td>AdamW b2=0.95, wd=0.02, sd=0.05, dropout=0, no grad clip</td><td>same</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Learning rate / schedule</td><td>5e-4 max @ batch 1024, OneCycleLR pct_start=0.1</td><td>same</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Label smoothing (bit-CE)</td><td>0.1</td><td>0.1</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Bit order</td><td>LSB-first</td><td>LSB-first</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Eval inference</td><td>4-step iterative</td><td>4-step iterative</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Invalid-code handling</td><td>no silent project, report invalid_rate</td><td>same</td><td><span class="good">✓</span></td></tr>
+      <tr><td>Forbidden shortcuts</td><td>no CE warm-start, no <code>load_backbone_from</code>, no aux CE</td><td>same</td><td><span class="good">✓</span></td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>5. IN-21K-P-Specific Differences vs IN-1K</h2>
+    <table>
+      <tr><th>Axis</th><th>IN-1K (collaborator)</th><th>IN-21K-P (this work)</th><th>Implication</th></tr>
+      <tr><td>num_classes</td><td>1,000</td><td>10,450</td><td>10× larger output space</td></tr>
+      <tr><td>n_bits</td><td>10</td><td>14</td><td>+4 bits</td></tr>
+      <tr><td>2<sup>n_bits</sup></td><td>1,024</td><td>16,384</td><td>—</td></tr>
+      <tr><td>Invalid bit patterns</td><td>24 (<strong>2.3%</strong>)</td><td>5,934 (<strong>36%</strong>)</td><td>Inference may produce invalid codes; we count those as wrong.</td></tr>
+      <tr><td>Training samples</td><td>~1.28M</td><td>~12M</td><td>10× more total data</td></tr>
+      <tr><td>Per-class samples (avg)</td><td>~1,280</td><td>~1,150</td><td>roughly comparable</td></tr>
+      <tr><td>Per-class samples (median)</td><td>~1,280</td><td>~1,000 (long tail)</td><td>some classes have &lt;200 samples</td></tr>
+      <tr><td>Total backbone exposure / epoch</td><td>1× IN-1K</td><td>~10× IN-1K</td><td>Per epoch our backbone sees more, but it has to discriminate among 10× more classes.</td></tr>
+      <tr><td>Epoch budget</td><td>330</td><td>30</td><td>11× shorter wall-clock budget</td></tr>
+    </table>
+    <p>Net effect on expected top-1: 30 IN-21K-P epochs is roughly equivalent to 30-50 IN-1K epochs in terms of backbone gradient steps, but on a much harder discrimination task. We expect MBM Run AB to land somewhere between the collaborator's IN-1K Run AB ep59 (64.9%) and ep79 (68.5%) in difficulty-normalized terms, but absolute top-1 will be lower due to the 10× class space.</p>
+    <h3>Invalid-code concern (most distinct risk)</h3>
+    <p>With 36% of bit patterns invalid, MBM's iterative decoder must implicitly learn to avoid the [10450, 16383] integer range. Collaborator's final invalid_rate on IN-1K is 0.27% (118× lower than the random-baseline 2.3%). If the same suppression ratio holds, our 14-bit invalid_rate at convergence should land near 36% × (0.27 / 2.3) ≈ <strong>4%</strong>. If the suppression instead scales as <em>absolute residual</em> (0.27% directly), our invalid_rate could be ≤1%. The training-time check at ep12 will clarify; we will report invalid_rate per inference configuration in the final eval.</p>
+  </section>
+
+  <section class="card">
+    <h2>6. Caveats</h2>
+    <ul>
+      <li><strong>Recipe asymmetry between MBM and CE/semantic baselines.</strong> Standard CE (817683) and Semantic (817684) were trained with the legacy recipe (max_lr=3e-4, wd=1e-4, label_smoothing=0.2, RandAugment, RandomErasing, grad_clip=1.0) — designed for those heads. MBM Run AB uses the masked-bit recipe. We do not retrain the baselines under the new recipe; compute constraints make a third round infeasible. The asymmetry is two-directional: MBM's low-aug recipe is unfair to MBM if compared head-to-head with high-aug CE; CE's recipe is unfair to itself if forced into MBM's low-aug regime.</li>
+      <li><strong>Semantic is severely under-trained.</strong> Repeated preemption on <code>csail-shared-h200</code> prevented completion of full epoch + val cycles. <code>model_best.pth</code> on disk is from epoch 5 (top-1 = 5.8%). Ridnik et al. report ~37% top-1 at convergence on the same architecture. We report 5.8% as a lower bound, not a converged baseline.</li>
+      <li><strong>Standard crashed at ep28 from an OneCycleLR over-step.</strong> An IterableDataset jitter pushed the actual step count one past the precomputed <code>total_steps</code>, raising <code>ValueError</code>. Fixed retroactively with a <code>try/except ValueError</code> around <code>scheduler.step()</code>. Pre-crash ep28 best (48.68% / 79.01%) is preserved and is the basis for the reported standard baseline; resume continues from <code>model_last.pth</code>.</li>
+      <li><strong>30 epochs is a constrained budget.</strong> Collaborator's Run AB needed 99 epochs to hit 70% top-1 on IN-1K. We can only afford 30 epochs here. Reported numbers should be interpreted as "30-epoch budget result", not "converged result".</li>
+      <li><strong>Wandb step-collision bug discovered.</strong> Per-epoch <code>val/*</code> wandb logs were silently dropped due to step collision with per-step train logs (IterableDataset jitter pushes the per-step counter past the precomputed <code>(epoch+1) × steps_per_epoch</code>). Fixed via <code>wandb.define_metric("val/*", step_metric="epoch")</code> + dropping the explicit step argument on per-epoch logs. Historical SLURM stdout contains all per-epoch numbers; retroactive backfill to wandb is straightforward.</li>
+      <li><strong>Hierarchy encoding ablation not run.</strong> The codebase supports <code>--encoding=hierarchy</code> (re-permute class indices so high-order bits track WordNet ancestor levels). Compute budget did not allow a second MBM variant. Hierarchy encoding remains the most-promising future-work direction: it directly addresses both the remasking negative result and the top-K diversity issue.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>7. Open Questions for Collaborator</h2>
+    <ul>
+      <li><strong>CutMix small-patch tail case.</strong> With K=80 and a CutMix lam ≈ 0.99 (small patch), <code>soft_top2</code> round-to-integer view allocation gives 79/1 split: the secondary class gets only one mask view, which is a noisy supervision signal. Did you observe degradation in trajectory health for cutmix-dominated batches, or is this tail behavior absorbed into the K=80 average?</li>
+      <li><strong>Invalid-code rate scaling.</strong> Your IN-1K final invalid_rate is 0.27% with 2.3% of bit patterns invalid. Did you observe how invalid_rate scales with the fraction of invalid bit patterns? We have 36% invalid space on 14 bits — ~16× yours. We expect somewhere between 0.3% (if the model learns the same absolute residual) and 4% (if it learns the same suppression ratio), but the actual trajectory matters for whether hierarchy encoding becomes more urgent.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>8. Next Steps</h2>
+    <ol>
+      <li>Let MBM Run AB (822746) run to ep30. Estimated wall-clock ~30 more hours given current 3h-per-epoch rate on csail-shared (with preemption overhead).</li>
+      <li>Let K=10 ablation (817685) continue alongside as a K-axis comparison point.</li>
+      <li>Once Run AB lands ep30, kick off the final evaluation pass with: (a) 4-strategy top-5 sweep, (b) explicit <code>invalid_rate</code> per inference combo, (c) per-hierarchy breakdown across all three heads, (d) full step sweep [1, 2, 4, 8, 16] for compute-vs-accuracy curve.</li>
+      <li>Backfill historical per-epoch val numbers from SLURM stdout into wandb so the final report can include trajectory plots even for the runs affected by the step-collision bug.</li>
+      <li>If MBM Run AB top-1 lands &lt;40% — re-examine implementation. Likely culprits: bit-token mixing path, soft_top2 view-count edge case, or LSB vs MSB encoding mismatch with any pretrained reference. (Sanity smoke test passed, so we expect this is not the case.)</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>9. Code Pointers</h2>
+    <table>
+      <tr><th>Component</th><th>File</th></tr>
+      <tr><td>MLP diffusion head (Run AB)</td><td><code>mbm/models.py: MLPDiffusionHead</code></td></tr>
+      <tr><td>K-mask + soft_top2 loss</td><td><code>mbm/mbm_loss.py: mbm_training_loss</code></td></tr>
+      <tr><td>Mixup / CutMix top-2 helper</td><td><code>mbm/mixup.py: apply_mixup_cutmix</code></td></tr>
+      <tr><td>Iterative decode + marginal log-probs</td><td><code>mbm/mbm_loss.py: mbm_iterative_decode</code>, <code>mbm_class_logprobs</code></td></tr>
+      <tr><td>Bit encoding (LSB/MSB)</td><td><code>mbm/bits.py</code></td></tr>
+      <tr><td>Final evaluation entry</td><td><code>evaluate.py</code> (4-strategy top-5 sweep + per-hierarchy + invalid_rate)</td></tr>
+      <tr><td>Training entry</td><td><code>train_mbm.py</code> (thin wrapper around <code>mbm.runner</code>)</td></tr>
+      <tr><td>Cluster submission</td><td><code>cluster/sbatch_train.sh</code> (Run AB defaults baked in)</td></tr>
+    </table>
+  </section>
+</div>
+</body>
+</html>

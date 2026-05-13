@@ -59,7 +59,7 @@
 <div class="wrap">
   <section class="hero">
     <h1>DeiT Masked Diffusion Head: 24h Progress Report</h1>
-    <p><strong>Time window:</strong> approximately 2026-05-11 14:00 UTC to 2026-05-12 14:05 UTC.</p>
+    <p><strong>Time window:</strong> approximately 2026-05-11 16:15 UTC to 2026-05-12 22:03 UTC, with earlier AB curve points included for context.</p>
     <p><strong>Core outcome:</strong> the best pure masked-diffusion DeiT run is now <span class="good">Run AB, K80 low-augmentation + corrected mixup/cutmix labels</span>, reaching <strong>76.600%</strong> single-step and <strong>78.294%</strong> iterative accuracy at epoch 319. This is the first clearly strong, mature, no-CE-shortcut configuration.</p>
     <p><span class="pill">No warm-start</span><span class="pill">No <code>load_backbone_from</code></span><span class="pill">No auxiliary CE</span><span class="pill">No CE head shortcut</span></p>
   </section>
@@ -69,10 +69,12 @@
     <ul>
       <li><strong>Best result moved substantially:</strong> AB improved from the first useful 24h-window read at ep59 <code>64.890 / 68.616</code> to ep319 <code>76.600 / 78.294</code>. The iterative decoder adds about <code>+1.69</code> points at the final useful eval.</li>
       <li><strong>Current best recipe is AB:</strong> <code>ViT_base_mdh_mlp</code>, <code>K=80</code>, low augmentation, corrected <code>soft_top2</code> mixup/cutmix target allocation, GELU MLP head, AdamW <code>b2=0.95</code>, WD <code>0.02</code>, stochastic depth <code>0.05</code>.</li>
-      <li><strong>Full augmentation is not dead, but it is still far behind:</strong> Z K80 full-augmentation reached ep139 <code>62.192 / 66.086</code>, while AB at matched ep139 was <code>72.550 / 74.542</code>. S K10 full-augmentation finished with ep319 <code>69.324 / 72.296</code>.</li>
-      <li><strong>CutMix-heavy variants are useful but not yet better than mature AB:</strong> AH p=0.75 reached ep239 <code>75.364 / 77.016</code>, essentially tied with matched AB ep239 <code>75.504 / 76.992</code>, but below mature AB ep319.</li>
-      <li><strong>The p=0.625 interpolation is not an early win:</strong> AI reached ep59 <code>63.920 / 67.830</code>, below AB, AH, and AF at matched ep59. Keep to ep79 only because it is healthy and already running.</li>
-      <li><strong>Sanity reproduction improved but is not closed:</strong> CE sanity v2/no-LayerScale failed to reproduce. CF, using <code>ViT_base_v3</code> plus current reference-alignment fixes, reached ep79 <code>55.926%</code>, clearly alive but still below the old v3 sanity trajectory.</li>
+      <li><strong>Full augmentation is not dead, but it is still far behind:</strong> Z K80 full-augmentation reached ep199 <code>65.262 / 68.472</code>, while low-aug K80 AB reached matched ep199 <code>74.064 / 75.886</code>. S K10 full-augmentation finished with ep319 <code>69.324 / 72.296</code>.</li>
+      <li><strong>CutMix-heavy variants are useful but not better than AB:</strong> AH p=0.75 reached ep279 <code>75.946 / 77.436</code>, still below mature AB ep319 <code>76.600 / 78.294</code>.</li>
+      <li><strong>The p=0.625 interpolation failed to recover:</strong> AI reached ep79 <code>66.740 / 69.914</code>, dominated by AB/AH/AF at matched ep79, and was retired.</li>
+      <li><strong>AB continuation is a negative signal so far:</strong> AL continued AB from its own <code>checkpoint_400320</code> with base LR <code>1e-4</code>, but first eval ep339 was only <code>75.758 / 77.562</code>, below AB ep319 and with worse loss.</li>
+      <li><strong>RandAug medium augmentation recovers late but remains weak:</strong> AJ ep79 reached <code>64.974 / 68.772</code>. AK ep39 reached <code>41.082 / 48.854</code> with higher invalid rate and was retired under slot pressure.</li>
+      <li><strong>Sanity reproduction is not closed:</strong> CE sanity v2/no-LayerScale failed to reproduce. CF, using <code>ViT_base_v3</code> plus current reference-alignment fixes, reached ep159 <code>58.016%</code>, far below the old v3 ep159 reference <code>65.530%</code>. CG old pre-mixup shuffle is close at ep19 but not a reproduction yet; CH approximate GELU was worse and retired; CI combines both toggles and is now running.</li>
       <li><strong>Infrastructure issues were handled:</strong> duplicate <code>config.load_from</code> resume failures were diagnosed; Z and AI were manually resumed correctly from their own checkpoints. Stale failed auto-reruns were ignored. Forbidden aux-CE Run H/6459 has not been resumed as an active branch.</li>
     </ul>
   </section>
@@ -114,14 +116,18 @@
     <table>
       <tr><th>Run</th><th>Design</th><th>Latest / best useful result</th><th>Status</th><th>Interpretation</th></tr>
       <tr><td>AB / 6435</td><td>K80, low aug, mixup+cutmix, <code>soft_top2</code>, p=0.5</td><td><strong>ep319 76.600 / 78.294</strong></td><td>Finished</td><td>Best deployable pure-diffusion config.</td></tr>
-      <tr><td>AH / 6448</td><td>K80, low aug, cutmix-heavy, <code>switch_prob=0.75</code></td><td>ep239 75.364 / 77.016</td><td>Running ep244</td><td>Matched-epoch competitive, but not better than mature AB.</td></tr>
-      <tr><td>AI / 6469</td><td>K80, low aug, interpolation p=0.625; manual resume from own checkpoint</td><td>ep59 63.920 / 67.830</td><td>Running ep66</td><td>Healthy, but below AB/AH/AF at matched ep59; wait ep79 before retiring.</td></tr>
+      <tr><td>AL / 6483</td><td>AB own-checkpoint continuation from <code>checkpoint_400320</code>, LR <code>1e-4</code>, ep500 target</td><td>ep339 75.758 / 77.562</td><td>Retired</td><td>First continuation eval was worse than AB ep319 and had worse loss; slot reused for sanity ablation.</td></tr>
+      <tr><td>AH / 6448</td><td>K80, low aug, cutmix-heavy, <code>switch_prob=0.75</code></td><td>ep299 76.066 / 77.674</td><td>Retired</td><td>Below matched AB ep299 76.266 / 77.988 and mature AB ep319; slot reused for sanity ablation.</td></tr>
+      <tr><td>AI / 6469</td><td>K80, low aug, interpolation p=0.625; manual resume from own checkpoint</td><td>ep79 66.740 / 69.914</td><td>Retired</td><td>Dominated by AB/AH/AF at matched ep79; slot reused for AL.</td></tr>
       <tr><td>AF / 6441</td><td>K80, low aug, cutmix-only</td><td>ep199 73.162 / 74.960</td><td>Retired</td><td>Early acceleration did not hold; dominated by AB at mature checkpoints.</td></tr>
-      <tr><td>Z / 6453</td><td>K80, full baseline augmentation, mixup+cutmix, <code>soft_top2</code></td><td>ep139 62.192 / 66.086</td><td>Running ep144</td><td>Delayed catch-up exists, but it remains far below low-aug K80.</td></tr>
+      <tr><td>Z / 6485</td><td>K80, full baseline augmentation, mixup+cutmix, <code>soft_top2</code></td><td>ep199 65.262 / 68.472</td><td>Running ep200+</td><td>Effective full-augmentation control after 6484 infra failure; delayed catch-up exists, but it is still <code>-8.802 / -7.414</code> behind matched AB ep199.</td></tr>
       <tr><td>S / 6433</td><td>K10, full baseline augmentation, mixup+cutmix, <code>soft_top2</code></td><td>ep319 69.324 / 72.296</td><td>Finished</td><td>Full aug improves slowly but is not competitive with AB.</td></tr>
-      <tr><td>CF / 6457</td><td>CE sanity, <code>ViT_base_v3</code> + current fixes, no warm-start</td><td>ep79 55.926</td><td>Running ep80+</td><td>Sanity path alive, but reference reproduction still incomplete.</td></tr>
-      <tr><td>AJ / 6474</td><td>AB + RandAugment only; no reprob, no repeated aug</td><td>eval0 0.104 / 0.114</td><td>Running ep7</td><td>Medium-augmentation compromise; first meaningful read is ep19.</td></tr>
-      <tr><td>AK / 6475</td><td>AB + RandAugment + reprob=0.25; no repeated aug</td><td>eval0 0.098 / 0.116</td><td>Running after healthy startup</td><td>Tests whether RA+random-erasing helps without full-aug slowness.</td></tr>
+      <tr><td>CF / 6457</td><td>CE sanity, <code>ViT_base_v3</code> + current fixes, no warm-start</td><td>ep159 58.016</td><td>Running ep163+</td><td>Dropped versus ep139 and remains far below old sanity ep159; reproduction is unresolved.</td></tr>
+      <tr><td>CG / 6487</td><td>CE sanity, <code>ViT_base_v3</code>, old pre-mixup shuffle restored, exact GELU</td><td>ep19 38.094</td><td>Running ep29+</td><td>Closest ep19 sanity ablation so far, but still below old 6380 ep19 38.770; keep to ep39.</td></tr>
+      <tr><td>CH / 6488</td><td>CE sanity, <code>ViT_base_v3</code>, approximate GELU, no pre-mixup shuffle</td><td>ep19 36.320</td><td>Retired</td><td>Worse than CF/CG at matched ep19; slot reused for combined CG+CH ablation.</td></tr>
+      <tr><td>CI / 6489</td><td>CE sanity, old pre-mixup shuffle + approximate GELU</td><td>eval0 0.096; running ep7+</td><td>Running</td><td>Combined sanity ablation; config verified with no warm-start, no backbone load, no diffusion head.</td></tr>
+      <tr><td>AJ / 6474</td><td>AB + RandAugment only; no reprob, no repeated aug</td><td>ep79 64.974 / 68.772</td><td>Running ep91+</td><td>Still below AB at matched ep79 68.464 / 71.404, but recovery is real; keep because augmentation may be delayed.</td></tr>
+      <tr><td>AK / 6475</td><td>AB + RandAugment + reprob=0.25; no repeated aug</td><td>ep39 41.082 / 48.854</td><td>Retired</td><td>Dominated by AJ at ep39 and higher invalid rate; slot reused for Z recovery.</td></tr>
     </table>
   </section>
 
@@ -133,8 +139,11 @@
       <tr><td>99</td><td>70.380 / 73.076</td><td>57.724 / 62.532</td><td>AB +12.656 / +10.544</td></tr>
       <tr><td>119</td><td>71.886 / 74.052</td><td>60.146 / 64.446</td><td>AB +11.740 / +9.606</td></tr>
       <tr><td>139</td><td>72.550 / 74.542</td><td>62.192 / 66.086</td><td>AB +10.358 / +8.456</td></tr>
+      <tr><td>159</td><td>73.496 / 75.538</td><td>63.456 / 67.114</td><td>AB +10.040 / +8.424</td></tr>
+      <tr><td>179</td><td>not in summary table</td><td>64.632 / 68.088</td><td>Z continues slow catch-up but remains noncompetitive with AB's mature curve</td></tr>
+      <tr><td>199</td><td>74.064 / 75.886</td><td>65.262 / 68.472</td><td>AB +8.802 / +7.414</td></tr>
     </table>
-    <p>S K10 full-aug finished at ep319 <code>69.324 / 72.296</code>, still below AB even at much later epochs. Therefore the next sensible direction is not more full augmentation; it is medium augmentation: AJ adds only RandAugment, AK adds RandAugment plus random erasing, both keeping AB's low WD/SD and no repeated augmentation.</p>
+    <p>S K10 full-aug finished at ep319 <code>69.324 / 72.296</code>, still below AB even at much later epochs. The medium-augmentation test is now partly resolved: AJ adds only RandAugment and reached ep79 <code>64.974 / 68.772</code>; AK added RandAugment plus random erasing but was retired at ep39 because it was worse than AJ and had a higher invalid rate.</p>
   </section>
 
   <section class="card">
@@ -155,7 +164,10 @@
     <table>
       <tr><th>Sanity branch</th><th>Result</th><th>Conclusion</th></tr>
       <tr><td>v2/no-LayerScale sanity</td><td>ep99 56.084%</td><td>Did not reproduce old v3 sanity; retired.</td></tr>
-      <tr><td>CF: <code>ViT_base_v3</code> + current fixes</td><td>ep19 37.472, ep39 49.134, ep59 53.316, ep79 55.926</td><td>Healthy and better than v2/no-LayerScale, but still below old v3 references such as ep59 59.132 and ep99 62.754. Continue to ep99 before more code changes.</td></tr>
+      <tr><td>CF: <code>ViT_base_v3</code> + current fixes</td><td>ep19 37.472, ep39 49.134, ep59 53.316, ep79 55.926, ep99 57.926, ep119 55.424, ep139 58.626, ep159 58.016</td><td>Dropped at ep159 and remains below old v3 references such as ep159 65.530. Do not claim reproduction yet.</td></tr>
+      <tr><td>CG: old pre-mixup shuffle restored</td><td>ep19 38.094; running ep22+</td><td>Close to old 6380 ep19 38.770 but not matched; keep to ep39 before deciding.</td></tr>
+      <tr><td>CH: approximate GELU restored</td><td>ep19 36.320; retired</td><td>Approximate GELU alone worsened the current pipeline, so it was not the missing reproduction detail by itself.</td></tr>
+      <tr><td>CI: old pre-mixup shuffle + approximate GELU</td><td>eval0 0.096; running ep7+</td><td>Combined ablation now running because CG partially helped and CH alone hurt; first target is ep19.</td></tr>
     </table>
     <p>Interpretation: the current code path is not catastrophically broken, but the full DeiT baseline reproduction gap remains unresolved. This should not block AB-style diffusion research, but it remains an open risk for final absolute accuracy.</p>
   </section>
@@ -164,10 +176,12 @@
     <h2>8. Operational / Debugging Progress</h2>
     <ul>
       <li><strong>Z resume fixed:</strong> manager auto-resume produced duplicate <code>config.load_from</code> flags. Manual resume from Z's own checkpoint fixed the issue and produced the active Z run.</li>
+      <li><strong>Z recovered again after two infra events:</strong> effective Z 6453 hit an infrastructure/SSH failure after ep167.05 on a deleted v5p-8 TPU. Resume 6484 on <code>v6e-16-tmp201</code> restored correctly but failed with JAX/multihost coordination errors. It was then manually resumed as 6485 on <code>v6e-8-tmp208</code>, again from Z's own <code>checkpoint_200160</code>; no CE/backbone warm-start or aux CE was introduced.</li>
       <li><strong>AI resume fixed:</strong> original AI stopped due spot/SSH failure. Auto-resume failed with the same duplicate <code>config.load_from</code> pattern. Manual resume as 6469 restored from AI's own <code>checkpoint_25020</code> and is training normally.</li>
-      <li><strong>Stale errors quarantined:</strong> stale 6472, 6467, and 6463 were repeatedly ignored; they should not drive scientific decisions.</li>
+      <li><strong>Stale errors quarantined:</strong> stale 6482, 6477, 6472, 6467, and 6463 were repeatedly ignored; they should not drive scientific decisions.</li>
       <li><strong>Forbidden aux-CE branch avoided:</strong> parent 6381 still references resumed 6459, but no active 6459 window has appeared. We have not used aux CE, CE warm-start, or backbone loading for the effective diffusion experiments.</li>
-      <li><strong>New medium-augmentation branches launched:</strong> AJ and AK were launched after S/AB freed slots, directly addressing the question of whether some augmentation can improve late growth without the full-aug penalty.</li>
+      <li><strong>New medium-augmentation branches launched:</strong> AJ and AK were launched after S/AB freed slots, directly addressing the question of whether some augmentation can improve late growth without the full-aug penalty. AK was retired; AJ remains live to test delayed augmentation benefits.</li>
+      <li><strong>Sanity ablations launched:</strong> old sanity code differed from current CE path in pre-mixup shuffle and GELU approximation. CG restores the old pre-mixup shuffle; CH restored approximate GELU alone and was retired after a worse ep19; CI combines old pre-mixup shuffle and approximate GELU. All are CE sanity runs with no warm-start, no backbone load, and no aux CE.</li>
     </ul>
   </section>
 
@@ -216,13 +230,29 @@ dataset:
   </section>
 
   <section class="card">
-    <h2>10. Next 24h Plan</h2>
+    <h2>10. Latest Loop Addendum, 21:15-22:03 UTC</h2>
     <ul>
-      <li>Let AH reach ep259 if slots permit, but treat it as a matched-epoch challenger rather than the current best.</li>
-      <li>Let AI reach ep79; ep59 is already below AB/AH/AF, so retire if ep79 does not recover.</li>
-      <li>Let AJ and AK reach ep19/39; compare medium augmentation against AB/AH early curves.</li>
-      <li>Let Z reach ep159 to quantify whether full augmentation continues closing the gap or remains dominated.</li>
-      <li>Let CF sanity reach ep99 before changing sanity code again.</li>
+      <li><strong>AJ ep79:</strong> 64.974 single / 68.772 iterative, loss 0.288021, invalid 0.674%. RandAug-only is recovering but still below AB matched ep79 68.464 / 71.404.</li>
+      <li><strong>Z ep179:</strong> 64.632 single / 68.088 iterative, loss 0.309959, invalid 0.412%. Full augmentation continues slow catch-up but remains noncompetitive with low-aug K80.</li>
+      <li><strong>CF ep139:</strong> 58.626 CE accuracy. It recovered from ep119 but remains below old 6380 ep139 63.356, so sanity reproduction is unresolved.</li>
+      <li><strong>CG ep19:</strong> 38.094 CE accuracy, close to old 6380 ep19 38.770 but still not matched. Keep to ep39 before deciding if old pre-mixup shuffle explains most of the gap.</li>
+      <li><strong>CH ep19:</strong> 36.320 CE accuracy. Approximate GELU alone is worse than CF/CG and was retired.</li>
+      <li><strong>CI launched:</strong> combined old pre-mixup shuffle + approximate GELU sanity run 6489 started on <code>oulo2v</code>. Startup is healthy; config verified with <code>load_from=''</code>, <code>load_backbone_from=''</code>, and <code>use_diffusion_head=false</code>.</li>
+      <li><strong>22:48 addendum:</strong> CF ep159 is <code>58.016</code>, still not reproduced. Z ep199 is <code>65.262 / 68.472</code>, confirming full augmentation is still far behind AB at matched ep199, but it remains alive to ep219 unless slot pressure appears.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>11. Next 24h Plan</h2>
+    <ul>
+      <li><strong>19:50 update:</strong> AH reached ep299 76.066 / 77.674 and was retired because matched AB ep299 was better. AL remains a negative continuation signal and was also retired.</li>
+      <li><strong>AJ ep79:</strong> 64.974 single / 68.772 iterative, loss 0.288021. This is still below AB ep79 but shows delayed recovery, so keep it running rather than killing solely for slow augmentation convergence.</li>
+      <li><strong>CG/CH launched:</strong> CG tests old pre-mixup shuffle with exact GELU; CH tests approximate GELU with current input pipeline. Both are fresh CE sanity runs and must be compared to CF and old 6380 before changing the main diffusion recipe.</li>
+      <li><strong>20:44 update:</strong> Z reached ep179 64.632 / 68.088. It is stable and improving slowly; next meaningful checkpoint is ep199.</li>
+      <li><strong>22:03 update:</strong> CH was retired after weak ep19 and CI was launched as the combined old-shuffle + approximate-GELU sanity ablation.</li>
+      <li><strong>22:48 update:</strong> Z reached ep199 <code>65.262 / 68.472</code> and CF reached ep159 <code>58.016</code>. Neither changes the current best recipe.</li>
+      <li>Continue CF only as a diagnostic, not as a reproduced sanity baseline; ep159 is far below old sanity ep159 65.530.</li>
+      <li>Next wake should check AJ progress toward ep99, CG toward ep39, CI toward ep19, Z post-ep199 health, CF post-ep159 health, and forbidden 6459 absence.</li>
       <li>Keep enforcing no warm-start / no aux CE / no backbone load in all main diffusion branches.</li>
     </ul>
   </section>

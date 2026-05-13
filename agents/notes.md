@@ -2240,3 +2240,412 @@ Next loop priorities:
   - AI p=0.625 looks weaker at ep59; continue to ep79, then likely retire if it does not recover.
   - Continue Z as full-aug K80 control, CF sanity to ep99, and AJ/AK to first meaningful ep19 reads.
 - Action/decision: no kill, no resume, no new launch. Continue AH/Z/CF/AI/AJ/AK. Next checks: AJ ep19, AI ep79 progress, Z ep159, CF ep99, AH ep259, AK progress, and forbidden `6459` absence.
+
+## Manual Loop Update (2026-05-12 15:12-15:25 UTC)
+- Woke from in-turn `sleep 1800` at `2026-05-12 15:12:11 UTC`.
+- Loop-start full `agents/` directory re-read completed: `/tmp/deit_agents_full_read_20260512_151222.txt` (`5001` lines, sha256 `65475738a6fd202976c79bf16b113a1c90bb41c6ab105f61b91149345bdcab1c`). Re-read `agents/notes.md` before status/log checks.
+- Manager/effective status:
+  - `6448` AH running ep250-251; latest eval remains ep239 `75.364/77.016`.
+  - `6453` Z running ep151-152; latest eval remains ep139 `62.192/66.086`.
+  - `6457` CF sanity running ep90-92; latest eval remains ep79 `55.926`.
+  - `6469` AI running ep72-74; latest eval remains ep59 `63.920/67.830`.
+  - `6474` AJ reached ep19 and produced new eval; running ep20.
+  - `6475` AK running ep12-13; latest eval remains eval0 `0.098/0.116`.
+- New eval/result this loop:
+  - `6474` AJ K80 RandAug-only + AB-style mix/cut `soft_top2` ep19: `15.172%` single / `22.574%` iterative, loss `0.568567`, invalid `1.562%`. This is far below AB ep19 `32.838/39.854`, AH ep19 `32.018/39.488`, and AI ep19 `33.830/41.432`; RandAug-only medium augmentation greatly slows early convergence.
+- Interpretation/decision:
+  - AJ ep19 is a negative early signal for adding RandAugment, but because the user explicitly warned not to kill augmentation branches only for slow early convergence, keep AJ to ep39 before retiring.
+  - No new evals for Z/CF/AI/AH/AK in this loop; all effective logs look alive.
+  - Unrelated manager errors appeared for non-DeiT windows `6470`/`6471`; ignored because they are outside DeiT. Stale DeiT `6472`/`6467`/`6463` remain non-effective; reran stale ignores before the short wait. No active forbidden aux-CE `6459` observed.
+- Updated `agents/report_24h_progress_2026-05-12.html` again to include AJ ep19.
+- Action/decision: no kill, no resume, no new launch. Continue AH/Z/CF/AI/AJ/AK. Next checks: AK progress, Z ep159, AI ep79, CF ep99, AH ep259, AJ ep39 later, and forbidden `6459` absence.
+
+## Manual Loop/Report Update (2026-05-12 16:14-16:18 UTC)
+- User requested a 24h progress report update. I started by re-reading the full `agents/` directory as required memory: `/tmp/deit_agents_full_read_20260512_161451.txt` (`5031` lines, sha256 `e0a38161417c7ac24cec4eccc5a1f2775f1eb2bbd2ab0df2ab162a5d5a7ff569`). Re-read `agents/notes.md` before manager/log checks.
+- Manager/effective status at this check:
+  - `6448` AH running ep262; new ep259 eval arrived.
+  - `6453` Z running ep157; latest eval remains ep139 `62.192%` / `66.086%`, ep159 next.
+  - `6457` CF sanity running ep100; new ep99 eval arrived.
+  - `6469` AI running ep84-85; new ep79 eval arrived.
+  - `6474` AJ running ep28; latest eval remains ep19 `15.172%` / `22.574%`.
+  - `6475` AK running ep21; new ep19 eval arrived.
+  - `6435` AB and `6433` S remain Finished.
+- New evals/results this loop:
+  - `6448` AH K80 low-aug cutmix-heavy p=0.75 ep259: `75.704%` single / `77.226%` iterative, loss `0.252770`, invalid `0.196%`. This is AH's best so far, close to but still below mature AB ep319 `76.600/78.294`; matched AB ep259 was `75.758/77.414`, so AH is slightly below AB at this checkpoint.
+  - `6469` AI K80 low-aug p=0.625 ep79: `66.740%` single / `69.914%` iterative, loss `0.284592`, invalid `0.482%`. This is dominated by AB/AH/AF at matched ep79 (`AB 68.464/71.404`, `AH 68.572/72.092`, `AF 67.614/71.588`). The p=0.625 interpolation did not recover by ep79 and is a retirement candidate if a slot is needed.
+  - `6475` AK K80 RandAug+reprob medium-aug ep19: `15.154%` single / `22.686%` iterative, loss `0.570874`, invalid `1.896%`. This is essentially tied with AJ ep19 and far below AB/AH/AI at matched ep19; random erasing did not fix RandAug's early slowdown. Keep to ep39 unless slot pressure is severe, per user instruction not to kill augmentation only for slow early convergence.
+  - `6457` CF sanity v3/current-fixes ep99: `57.926%`, loss `2.016021`. Healthy and better than failed no-LayerScale sanity, but still below the old v3 sanity ep99 reference `62.754%`; sanity reproduction is improved but not fully solved.
+- Stale/forbidden status:
+  - Reran `ignore-error` for stale DeiT jobs `6477`, `6472`, `6467`, and `6463`. Treat them as non-effective; do not resume.
+  - Old aux-CE parent `6381` still references `resumed in 6459`, but no active `6459` window appears in the effective DeiT manager listing. Continue verifying absence; do not resume Run H or any aux-CE branch.
+- Report update: updated `agents/report_24h_progress_2026-05-12.html` to include AH ep259, AI ep79, AK ep19, CF ep99, and the current retirement/keep decisions.
+- Interpretation/decision:
+  - AB remains the best deployable no-shortcut pure diffusion configuration.
+  - AH is close and healthy but not superior to AB at matched ep259 or mature ep319; keep if slots are available.
+  - AI p=0.625 is now clearly dominated by ep79; retire when a better use for the slot is ready.
+  - AJ/AK are very slow with RandAug at ep19 but should reach ep39 before final judgment unless a stronger branch needs the slots.
+  - Z remains the K80 full-augmentation control and should reach ep159.
+  - CF sanity should not be declared reproduced; next action is analysis or another targeted sanity ablation after ep99, not claiming success.
+
+## Manual Loop Update (2026-05-12 16:53-17:04 UTC)
+- Woke/continued after user said `继续loop`; started by re-reading the full `agents/` directory as required memory: `/tmp/deit_agents_full_read_20260512_165345.txt` (`5068` lines, sha256 `8c151c13634298541df86b9bf6aedb5ba9e1146f168f4edb28ad3043fa6bf17b`). Re-read `agents/notes.md` before manager/log checks.
+- Manager/effective status before intervention:
+  - `6448` AH running ep269-270; latest eval remains ep259 `75.704%` / `77.226%`.
+  - `6453` Z running ep161-162; new ep159 eval arrived.
+  - `6457` CF sanity running ep107; latest eval remains ep99 `57.926%`.
+  - `6469` AI running ep91-93; latest eval remains ep79 `66.740%` / `69.914%`, already dominated.
+  - `6474` AJ running ep34-35; latest eval remains ep19 `15.172%` / `22.574%`.
+  - `6475` AK running ep27-28; latest eval remains ep19 `15.154%` / `22.686%`.
+- New eval/result this loop:
+  - `6453` Z K80 full baseline augmentation + corrected `soft_top2` ep159: `63.456%` single / `67.114%` iterative, loss `0.311251`, invalid `0.452%`. Z continues delayed catch-up (`62.192/66.086` at ep139 -> `63.456/67.114` at ep159) but remains far behind low-aug K80 at matched epochs, so it is a control rather than a candidate best.
+- Retired/replaced dominated branch:
+  - Killed `6469` AI p=0.625 on `oulo2v`. Rationale: ep79 `66.740/69.914` is dominated by AB/AH/AF at matched ep79; no need to spend another checkpoint unless explicitly requested.
+- Launched new Run AL on the freed `oulo2v` slot:
+  - Created `configs/remote_run_AL_ab_k80_lowaug_mixlabel_continue500_lowLR_config.yml` and copied it to `configs/remote_run_config.yml` before launch.
+  - Window: `6483` on `kmh-tpuvm-v6e-8-spot-gzy-oulo2v`.
+  - Logdir: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260512_165908_kba0nm_kmh-tpuvm-v6e-8-spot-gzy-oulo2v_asia-northeast1-b__b_lr_ep_eval`.
+  - Stage dir: `/kmh-nfs-ssd-us-mount/staging/sqa/260512165907-lneo0h-0ebb0f8-code`.
+  - Design: continue AB from its own diffusion checkpoint/logdir, `num_epochs=500`, base LR lowered to `1e-4` to avoid a large LR jump after stretching the schedule; all AB data/head settings otherwise preserved (`K80`, low aug, mix/cut `soft_top2`, AdamW b2 `0.95`, WD `0.02`, SD `0.05`).
+  - Safety: `load_from` points to AB's own logdir, `load_backbone_from=''`, `head_aux_ce=false`, `aux_ce_loss_weight=0.0`; this is same-run diffusion checkpoint continuation, not CE warm-start / not backbone loading / not aux CE / not 投敌.
+  - Verified GCS source before launch: AB has `checkpoint_350280`, `checkpoint_375300`, and `checkpoint_400320` in `gs://kmh-gcp-asia-northeast1-b/.../20260511_093651...`.
+  - Startup verification: AL config printed correct values; log restored from `.../checkpoint_400320`, entered `epoch 320`, completed initial compilation, and produced first train line `[400400] train_accuracy=0.37201, train_loss=0.188, train_lr=6.5092e-05, steps_per_second=6.3028, ep=320.03`. No startup Traceback/OOM/fatal observed in checked tail.
+- Stale/forbidden cleanup:
+  - Manager auto-reran the old stale Z resume1 parent `6438` as window `6482`; killed `6482` and ran `ignore-error 6482`. This is non-effective and must not be resumed.
+  - Reran `ignore-error` for stale `6477`, `6472`, `6467`, and `6463`. Treat all as non-effective.
+  - Old aux-CE parent `6381` still references `resumed in 6459`, but no active `6459` window appears in the effective DeiT listing. Continue verifying absence; do not resume Run H or aux-CE.
+- Interpretation/decision:
+  - AB remains the best deployable config; AL now tests whether AB's late improvement continues under low-LR extension.
+  - Z full augmentation keeps improving but is still too far behind to promote.
+  - AH remains a close matched-epoch challenger, but not better than AB.
+  - AJ/AK remain slow medium-augmentation branches; keep to ep39 unless slot pressure becomes severe.
+  - CF sanity is healthy but not reproduced; keep running/recording while deciding a later targeted sanity ablation.
+- Report maintenance: updated `agents/report_24h_progress_2026-05-12.html` after launch so it now reflects AI retired, AL running from AB `checkpoint_400320`, Z ep159, and stale `6482` cleanup.
+
+## Manual Loop Update (2026-05-12 17:39-17:58 UTC)
+- Loop-start full `agents/` directory re-read completed for this wake: `/tmp/deit_agents_full_read_20260512_173929.txt` (`5138` lines, sha256 `908a9e2e614478581471800f3d93385a8d15a794a4493afa7960aa8db4f22721`). Re-read `agents/notes.md` and other memory files before status/log checks.
+- Manager/effective status at this wake:
+  - `6448` AH running; new ep279 eval arrived and job continued through ep282.
+  - `6453` Z full-aug control hit SSH/TPU failure after ep167.05 on deleted `v5p-8-spot-gzy-96acuy`; this was infrastructure/preemption, not a code traceback. Effective Z is now resumed as `6484` on `v6e-16-tmp201` / `kmh-tpuvm-v6e-16-spot-gzy-38xirk`.
+  - `6457` CF sanity running ep117; latest eval remains ep99.
+  - `6474` AJ running ep45; new ep39 eval arrived.
+  - `6475` AK running ep38; latest eval remains ep19, ep39 expected next wake.
+  - `6483` AL running ep331; no eval yet after AB checkpoint continuation, next eval expected around ep339.
+- New evals/results:
+  - `6448` AH K80 low-aug cutmix-heavy p=0.75 ep279: `75.946%` single / `77.436%` iterative, loss `0.260340`, invalid `0.254%`. AH is still improving, but remains below mature AB ep319 `76.600%` / `78.294%`; keep only while slots permit.
+  - `6474` AJ K80 RandAug-only + AB-style mix/cut `soft_top2` ep39: `42.102%` single / `49.336%` iterative, loss `0.419921`, invalid `1.028%`. This is a large catch-up from ep19 `15.172/22.574`, but still far below low-aug K80 matched ep39 (`AB 57.148/61.642`, `AH 57.566/62.152`). Do not kill immediately because the user warned full/stronger augmentation may converge slowly; keep to ep59 unless slot pressure becomes severe.
+- Z recovery details:
+  - `6453` log ended after `[209000]` / ep167.05 with `Connection refused`; last saved checkpoint before failure was `checkpoint_200160` from ep159.
+  - First tried `tpu.py resume window=6453 sqa`; it failed because old TPU status was `deleted`.
+  - Found no free v6e-8/v5p-8 TPUs, but `v6e-16-tmp201` was free and satisfies the user constraint `v6e <= 32`. `dataset.num_tpus` is only present in YAML and not referenced by code; batch sharding uses JAX device counts, so v6e-16 is acceptable.
+  - Ran manual resume `tpu.py resume window=6453 tpu=v6e-16-tmp201 sqa`, producing child window `6484`.
+  - `6484` logdir: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260512_175307_38qsol_kmh-tpuvm-v6e-16-spot-gzy-38xirk_asia-northeast1-b__b_lr_ep_eval`.
+  - `6484` config safety verified: `load_from` points to Z's own logdir `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_204334_8km7qk_kmh-tpuvm-v5p-8-spot-gzy-96acuy_us-east5-a__b_lr_ep_eval`, `load_backbone_from=''`, `head_aux_ce=false`, no aux CE, no CE/backbone warm-start. The tmux command had only one `--config.load_from`, so no duplicate flag bug.
+  - `6484` startup verified: restored from `gs://kmh-gcp-asia-northeast1-b/.../20260511_204334.../checkpoint_200160`, entered epoch 160, completed initial compilation, and reached `[201100] train_accuracy=0.53088, train_loss=0.40598, train_lr=0.00053326, steps_per_second=11.712, ep=160.73`. Some progress from ep160-167 was lost because the latest saved checkpoint was ep159, but the effective Z control is alive again.
+- Other current statuses:
+  - `6483` AL AB-continuation: running ep331.22, no eval yet; latest train line `[414400] train_accuracy=0.37674, train_loss=0.18853, train_lr=5.9233e-05, steps_per_second=4.2968, ep=331.22`. Wait for ep339 eval before judging.
+  - `6457` CF sanity: latest eval ep99 `57.926%`, running ep117.33. Still not a clean reproduction of old v3 sanity ep99 `62.754%`; continue collecting.
+  - `6475` AK: running ep38.28, latest eval ep19 `15.154%` / `22.686%`; ep39 expected next wake.
+- Stale/forbidden status:
+  - Old forbidden aux-CE parent `6381` still references `resumed in 6459`, but there is no active `6459` window in the effective manager checks. Continue verifying absence; do not resume Run H or any aux-CE branch.
+  - Stale DeiT errors/parents `6482`, `6477`, `6472`, `6467`, and `6463` remain non-effective; do not resume them.
+- Interpretation/decision:
+  - AB remains the best deployable no-shortcut pure diffusion config.
+  - AH continues to improve but is not better than AB; keep only if slots remain available.
+  - AJ's ep39 recovery means augmentation branches should not be killed purely on slow ep19, but AJ is still far behind low-aug. Keep to ep59.
+  - AK should reach ep39 before deciding.
+  - Z had infrastructure failure and was correctly resumed manually; keep it to ep179/199 as the K80 full-augmentation control.
+  - No additional new launch this wake. Continue AH/Z(6484)/CF/AJ/AK/AL.
+- Next checks after the next `sleep 1800`: Z `6484` still running and maybe ep179, AK ep39 eval, AL ep339 eval if reached, AJ progress toward ep59, CF ep119 eval, AH ep299, and forbidden `6459` absence.
+- Report maintenance: updated `agents/report_24h_progress_2026-05-12.html` with AH ep279, AJ ep39, Z `6484` recovery, and the updated next-24h plan.
+
+## Manual Loop Update (2026-05-12 18:45-18:50 UTC)
+- User requested `继续loop`; loop-start full `agents/` directory re-read completed before status checks: `/tmp/deit_agents_full_read_20260512_184548.txt` (`5198` lines, sha256 `98586581ae21b897a8fe837bfcab267d8041d81b411389f27549375566146754`). Re-read `agents/notes.md` and other memory files before manager/log inspection.
+- Manager snapshot recorded at `/tmp/deit_tpu_check_20260512_184619.txt` (`456` lines, sha256 `c41c1b6d9538fedbce9adb171d6778d6f6d8cd681a954fe4f8b6a16cf6cf0c4d`). Effective active DeiT jobs are `6448` AH, `6457` CF, `6474` AJ, `6483` AL, and `6485` Z. `6475` AK and `6484` Z-on-v6e16 are no longer effective.
+- Current effective status:
+  - `6448` AH is alive around ep291. Latest eval remains ep279 `75.946%` single / `77.436%` iterative, loss `0.260340`, invalid `0.254%`. Keep to ep299 if slot permits, but it is still below AB ep319 `76.600/78.294`.
+  - `6485` Z is alive around ep161.5 after manual resume on `v6e-8-tmp208` / `kmh-tpuvm-v6e-8-spot-gzy-3djlis`. It restored from Z's own `checkpoint_200160` and is training normally; latest train checked `[202100]`, ep161.53, train_acc `0.57740`, train_loss `0.37256`. No CE/backbone warm-start or aux CE.
+  - `6457` CF sanity is alive around ep124.9. New useful eval from the wake window: ep119 `55.424%`, loss `2.255460`. This is worse than ep99 `57.926%`, so sanity reproduction is definitely not closed and may be overfitting/instability under current setup.
+  - `6474` AJ is alive around ep52.8. Latest eval remains ep39 `42.102%` / `49.336%`, loss `0.419921`, invalid `1.028%`. Keep to ep59 because RandAug branches may be delayed, but it is far behind low-aug K80 at matched ep39.
+  - `6483` AL is alive around ep340.5. First continuation eval arrived at ep339: `75.758%` / `77.562%`, loss `0.261706`, invalid `0.272%`. This is worse than AB ep319 `76.600/78.294` and worse loss than AB, so AL is a dominated/degradation signal unless it later recovers.
+- Retired/failed effective changes inherited from the previous wake and verified in this loop:
+  - `6475` AK RandAug+reprob reached ep39 `41.082%` / `48.854%`, loss `0.427552`, invalid `1.650%`, worse than AJ ep39 and much worse invalid rate. It was killed/retired to free the slot for Z recovery. This is not killing only for slow early convergence; it is dominated by AJ at the same checkpoint under slot pressure.
+  - `6484` Z resume on `v6e-16-tmp201` failed from JAX/multihost coordination/infrastructure errors (`different incarnation`, `DEADLINE_EXCEEDED`, `ALREADY_EXISTS`), not model code. It was killed and replaced by `6485` on v6e-8.
+- Stale/forbidden status:
+  - Old forbidden aux-CE parent `6381` still references `resumed in 6459`, but no active `6459` appears in the effective manager checks. Continue verifying absence; do not resume Run H or any aux-CE branch.
+  - Stale `6482/6477/6472/6467/6463` remain non-effective. Ignore unless new evidence contradicts this.
+- Interpretation/decision:
+  - AB remains the best deployable pure-diffusion recipe.
+  - AL is now a negative continuation read; do not promote it. If a better slot use is ready or slot pressure appears, retire AL rather than waiting many more checkpoints.
+  - AK is retired; AJ should reach ep59 as the remaining medium-augmentation diagnostic.
+  - Z `6485` is the effective full-augmentation K80 control; next meaningful eval is ep179.
+  - CF should not be called reproduced; ep119 regression strengthens the need for a later targeted sanity analysis rather than more blind waiting.
+- Action this loop: no new scientific launch. No additional kill because no clearly higher-value replacement config is ready at this moment. Updated report/results, then continue manual loop with `sleep 1800`.
+
+## Manual Loop Update (2026-05-12 19:21-19:50 UTC)
+- Manual wake sequence followed the user loop rule. I completed full `agents/` memory reads before acting:
+  - 19:21 read: `/tmp/deit_agents_full_read_20260512_192129.txt` (`5236` lines, sha256 `875a55e8ad6aefbd8e21f82f442b49b8f36745089030a8c4703c3236ce14c9c6`).
+  - 19:43 read: `/tmp/deit_agents_full_read_20260512_194325.txt` (`5237` lines, sha256 `d1d7b6f9a8726787496f466ae6b1a93e0a5ee1b78130189692b0f8dd8fb9833e`).
+- Manager/log snapshots captured:
+  - `/tmp/deit_tpu_check_20260512_192129.txt` (`456` lines, sha256 `ba4a00e7cf1ec417c4339853ca1189a5504cb676e8327662d9b5b92c79cbc9fd`).
+  - `/tmp/deit_tpu_check_20260512_193305.txt` (`457` lines, sha256 `c29dd88df52ec6346eb0b70ee16023648bc59cf9535066662110c2e98cb4052c`).
+  - `/tmp/deit_tpu_check_20260512_194825.txt` (`461` lines, sha256 `a7e7384c68e1f1fe23b2e7e3cbdb6ceb3e67adc07ef411c5e1a0fc617d9abe0c`).
+- New evals/results before slot recycling:
+  - `6448` AH K80 low-aug cutmix-heavy p=0.75 ep299: `76.066%` single / `77.674%` iterative, loss `0.253017`, invalid `0.292%`. This is below AB ep299 `76.266/77.988` and below AB ep319 `76.600/78.294`; AH was killed/retired to free a slot.
+  - `6474` AJ K80 RandAug-only + AB-style mix/cut `soft_top2` ep59: `58.098%` single / `63.068%` iterative, loss `0.324749`, invalid `1.026%`. Still far below AB ep59 `64.890/68.616`, but it recovered strongly from ep39; keep running because the user warned augmentation may be delayed.
+  - `6483` AL AB-continuation latest useful eval remains ep339 `75.758/77.562`, loss `0.261706`. It was killed/retired after the negative continuation signal to free a sanity-ablation slot.
+  - `6457` CF sanity is alive at real log ep135. Latest eval remains ep119 `55.424%`, loss `2.255460`; the manager's temporary ep1/ep13 display during launch was table/refresh noise, not an actual reset.
+  - `6485` Z full-augmentation K80 control is alive around log ep171.68; latest meaningful eval remains ep159 `63.456/67.114`.
+- Sanity-regression analysis completed before launch:
+  - Old reproduced-ish CE sanity `6380` used `ViT_base_v3`, AdamW b2 `0.999`, WD `0.05`, full DeiT augmentation, mixup/cutmix, and no diffusion head; old evals included ep99 `62.754`, ep119 `62.622`, ep139 `63.356`, ep159 `65.530`, ep199 `66.196`, ep319 `72.814`.
+  - Compared old staging code against current code. Two likely codepath differences for CE sanity were identified: old `input_pipeline.py` did a pre-mixup batch `randperm`, and old Flax `nn.gelu` default is approximate GELU while current code had forced exact GELU.
+  - Implemented targeted switches without changing current defaults for diffusion runs: `dataset.pre_mixup_shuffle` in `input_pipeline.py`, `config.gelu_approximate` in `configs/default.py`, and plumbing through `models.py` / `train.py`. `py_compile` passed for `input_pipeline.py`, `models.py`, `train.py`, `configs/default.py`, `configs/load_config.py`.
+- Slot actions:
+  - Killed/retired `6448` AH after matched ep299 was dominated by AB.
+  - Killed/retired `6483` AL after ep339 continuation degraded versus AB.
+  - Launched `6487` CG on `kmh-tpuvm-v6e-8-spot-gzy-j3rqvs` from `configs/remote_run_CG_sanity_v3_premixshuffle_config.yml`.
+  - Launched `6488` CH on `kmh-tpuvm-v6e-8-spot-gzy-oulo2v` from `configs/remote_run_CH_sanity_v3_approxgelu_config.yml` after manually answering the stale manager prompt and clearing dead AL jobs on that TPU.
+- CG details:
+  - Logdir: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260512_193849_popqlo_kmh-tpuvm-v6e-8-spot-gzy-j3rqvs_asia-northeast1-b__b_lr_ep_eval`.
+  - Config verified: `model=ViT_base_v3`, `gelu_approximate=false`, `dataset.pre_mixup_shuffle=true`, `use_diffusion_head=false`, `load_from=''`, `load_backbone_from=''`, AdamW b2 `0.999`, WD `0.05`, SD `0.1`, full DeiT augmentation/mixup/cutmix.
+  - Startup healthy: first batch at 19:40:48, initial compilation completed at 19:42:08, eval0 `0.096%`, and train reached ep1.04. No Traceback/FATAL/OOM observed.
+- CH details:
+  - Logdir: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260512_194618_hzulrh_kmh-tpuvm-v6e-8-spot-gzy-oulo2v_asia-northeast1-b__b_lr_ep_eval`.
+  - Config verified: `model=ViT_base_v3`, `gelu_approximate=true`, `dataset.pre_mixup_shuffle=false`, `use_diffusion_head=false`, `load_from=''`, `load_backbone_from=''`, AdamW b2 `0.999`, WD `0.05`, SD `0.1`, full DeiT augmentation/mixup/cutmix.
+  - Startup healthy: first batch at 19:48:16, initial compilation completed at 19:49:01, reached ep0.159 by 19:49:49. No Traceback/FATAL/OOM observed.
+- Stale/forbidden status:
+  - Old forbidden aux-CE parent `6381` still references `resumed in 6459`, but no active/effective `6459` was observed. Continue not resuming Run H / aux CE.
+  - Stale `6482/6477/6472/6467/6463` remain non-effective unless new evidence appears.
+- Interpretation/decision:
+  - AB remains the best deployable pure diffusion config.
+  - AH and AL are retired; both were close but dominated at matched/mature checkpoints.
+  - AJ stays alive to ep79 or at least next checkpoint because augmentation convergence is delayed.
+  - Z stays alive as full-augmentation K80 control; next useful eval around ep179.
+  - CF stays as the current exact-GELU/no-pre-shuffle sanity diagnostic, while CG/CH isolate the two most plausible old-vs-current code differences.
+  - Continue manual loop with `sleep 1800` after updating memory/report.
+
+## Manual Loop Update (2026-05-12 20:23-20:44 UTC)
+- Woke from manual `sleep 1800` at `2026-05-12 20:22:59 UTC` and immediately re-read the full `agents/` directory before checking jobs: `/tmp/deit_agents_full_read_20260512_202305.txt` (`5296` lines, sha256 `2defba5bdd6e95baa64939221393c1a32a683995be29a99f2d78205aa4cacc75`). Re-read `agents/notes.md` as part of this full memory read.
+- Manager snapshot captured: `/tmp/deit_tpu_check_20260512_202323.txt` (`466` lines, sha256 `a2e05ac0e8ff6bea1b3f69b081d9db339f3e409b91885a075894a03532dd6e9c`). The captured table did not parse cleanly with simple grep, so effective status below is from authoritative per-run logs.
+- Active effective jobs and new results:
+  - `6457` CF sanity: new ep139 eval `58.626%`, loss `2.027009`; running at ep142.75 after eval. This recovers from ep119 `55.424%` and beats CF ep99 `57.926%`, but remains well below old 6380 sanity ep139 `63.356%`. Continue as diagnostic only; not reproduced.
+  - `6485` Z K80 full-augmentation control: after a short wait, new ep179 eval arrived: `64.632%` single / `68.088%` iterative, loss `0.309959`, invalid `0.412%`. It continues delayed catch-up from ep159 `63.456/67.114`, but remains far below low-aug K80 AB's trajectory. Keep to ep199.
+  - `6474` AJ RandAug-only diagnostic: latest eval still ep59 `58.098/63.068`, running ep70.815. No error; next useful eval should be ep79.
+  - `6487` CG CE sanity ablation: startup remains healthy, running ep8.951. Train accuracy around 6.9%-7.1%, loss around 6.06-6.08. No Traceback/FATAL/OOM observed.
+  - `6488` CH CE sanity ablation: startup remains healthy, running ep7.912. Train accuracy around 5.5%-5.9%, loss around 6.16-6.22. No Traceback/FATAL/OOM observed.
+- Interpretation/decision:
+  - No job needs resume or relaunch.
+  - No branch should be killed at this wake. CG/CH are too early but both healthy; AJ should reach ep79; Z should reach ep199; CF should continue until at least the next sanity checkpoint while CG/CH mature.
+  - Early sanity ablation read: CG is slightly ahead of CH in train accuracy/loss around ep8, but this is too early to decide whether pre-mixup shuffle or approximate GELU explains the old sanity gap.
+  - Continue enforcing no warm-start / no backbone load / no aux CE. Same-run checkpoint resumes only.
+- Next wake targets after the next manual `sleep 1800`: AJ progress toward ep79, Z toward ep199, CG/CH around ep13-15, CF around ep147, and continued absence of active forbidden `6459`.
+
+## Manual Loop Update (2026-05-12 21:15-22:03 UTC)
+- Woke from manual `sleep 1800` at `2026-05-12 21:15:02 UTC` and re-read full `agents/` memory before all checks: `/tmp/deit_agents_full_read_20260512_211507.txt` (`5324` lines, sha256 `c5e86ae2c16c1b8e728915ddb9cfa71cd070c3b67162df184ba834e006cb5fbc`). Re-read `agents/notes.md` as part of the full memory read.
+- Manager snapshots captured:
+  - `/tmp/deit_tpu_check_20260512_211520.txt` (`467` lines, sha256 `bbaaf6bf721036e865f0060cb20be41852564f37ebd39fd835b07fd6c8d1e7ef`).
+  - After CI launch: `/tmp/deit_tpu_check_20260512_220334.txt` (`465` lines, sha256 `f9a542790d9321bf2d3a8c4231d5e017bdb7044b39c3cdeb2621d4c608cc0fbc`).
+- New main diffusion / augmentation result:
+  - `6474` AJ RandAug-only + AB-style mix/cut `soft_top2` ep79: `64.974%` single / `68.772%` iterative, loss `0.288021`, invalid `0.674%`. This is a large recovery from ep59 `58.098/63.068`, but still below matched AB ep79 `68.464/71.404` and below AH/AF matched ep79. Decision: keep to ep99 because augmentation may be delayed and no stronger slot use exists right now; do not promote.
+- Full-augmentation control status:
+  - `6485` Z is running around ep193.10. Latest useful eval remains ep179 `64.632/68.088`, loss `0.309959`, invalid `0.412%`. Keep to ep199; no error observed.
+- Current CF sanity status:
+  - `6457` CF is running around ep156.34. Latest eval remains ep139 `58.626%`, loss `2.027009`. It is still far below old 6380 ep139 `63.356%`; do not call sanity reproduced.
+- Sanity ablation first comparable checkpoint:
+  - Old 6380 CE sanity reference from its log: ep19 `38.770%`, ep39 `54.470%`, ep59 `59.132%`, ep79 `59.342%`, ep99 `62.754%`, ep119 `62.622%`, ep139 `63.356%`.
+  - `6457` CF current exact-GELU/no-pre-shuffle: ep19 `37.472%`.
+  - `6487` CG old pre-mixup shuffle + exact GELU: ep19 `38.094%`, loss `3.025813`. This is closer to old 6380 ep19 than CF but still below old by `0.676` points.
+  - `6488` CH approximate GELU + current input pipeline: ep19 `36.320%`, loss `3.091961`. This is worse than CF and CG, so approximate GELU alone is not the missing factor.
+- Action taken for sanity reproduction priority:
+  - Killed/retired `6488` CH after the weak ep19 read to free its `oulo2v` slot.
+  - Created `configs/remote_run_CI_sanity_v3_premixshuffle_approxgelu_config.yml` by combining the two old-behavior toggles: `dataset.pre_mixup_shuffle=true` and `gelu_approximate=true`.
+  - Validated CI config locally: `model=ViT_base_v3`, `gelu_approximate=True`, `dataset.pre_mixup_shuffle=True`, `load_from=''`, `load_backbone_from=''`, `use_diffusion_head=False`.
+  - Launched `6489` CI on `kmh-tpuvm-v6e-8-spot-gzy-oulo2v` after clearing killed CH jobs. Logdir: `/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260512_215922_mc6r0v_kmh-tpuvm-v6e-8-spot-gzy-oulo2v_asia-northeast1-b__b_lr_ep_eval`.
+  - CI startup verified: config has `pre_mixup_shuffle: true`, `gelu_approximate: true`, `load_from=''`, `load_backbone_from=''`, `use_diffusion_head=false`; first batch at 22:01:19, initial compilation completed at 22:02:02, reached ep0.239 by 22:03:18. No Traceback/FATAL/OOM observed.
+- Active effective jobs after action:
+  - `6457` CF sanity diagnostic, running.
+  - `6474` AJ medium-augmentation diagnostic, running.
+  - `6485` Z full-augmentation K80 control, running.
+  - `6487` CG pre-mixup-shuffle sanity ablation, running.
+  - `6489` CI combined old-behavior sanity ablation, running.
+  - `6488` CH retired/killed.
+- Stale/forbidden status:
+  - Old aux-CE parent `6381` still references `6459`, but no effective active Run H is being used; continue not resuming it.
+  - Stale `6482/6477/6472/6467/6463` remain non-effective.
+- Next wake targets: CI startup/eval0 and progress, CG toward ep39, AJ toward ep99, Z toward ep199, CF toward ep159, and forbidden `6459` absence.
+
+## Manual Loop Continuation (2026-05-12 22:06:24 UTC)
+- User requested continue loop; before doing any action, re-read full agents memory: /tmp/deit_agents_full_read_20260512_220515.txt (5369 lines, sha256 8793d6ca384d14bc2d50e7929bf8a8f60ecc7e6d7fc3dd8eaafb0ae5875c8209). Re-read agents/notes.md as part of this full memory read.
+- No new experiment status check was needed beyond the just-recorded 22:03 loop state. The immediate pending action was report maintenance from the previous loop.
+- Updated agents/report_24h_progress_2026-05-12.html to reflect the latest 22:03 state: AJ ep79, Z ep179/running ep193+, CF running ep156+, CG ep19/running ep22+, CH retired after weak ep19, and CI 6489 startup healthy.
+- Next manual wake targets remain: CI startup/eval0 and progress, CG toward ep39, AJ toward ep99, Z toward ep199, CF toward ep159, and continued absence of active forbidden 6459.
+- Starting another manual sleep 1800 after this memory/report update; do not rely on deit_auto_loop.sh or any script watcher.
+
+## Manual Loop Update (2026-05-12 22:36-22:50 UTC)
+- Woke from manual `sleep 1800` at `2026-05-12 22:36:34 UTC` and immediately re-read the full `agents/` directory before checking jobs: `/tmp/deit_agents_full_read_20260512_223642.txt` (`5384` lines, sha256 `55746a2e1939a2ae6d75680de297ebc718230dfdb5b71a5845f7d6db4e3bc376`). Re-read `agents/notes.md` as part of this full memory read.
+- Manager snapshot captured: `/tmp/deit_tpu_check_20260512_223704.txt` (`461` lines, sha256 `44308d45cb99174abce59f0e270460d6deeb1a901953c93e7a4e296b2d4b16b3`). Effective DeiT jobs in manager are `6457` CF Running ep161+, `6474` AJ Running ep89+, `6485` Z Running ep198+, `6487` CG Running ep27+, and `6489` CI Running ep5+. `6381` still shows `unknown (resumed in 6459)`, but no effective active forbidden aux-CE branch is being used.
+- New results / progress:
+  - `6485` Z K80 full-baseline-augmentation control reached ep199: `65.262%` single / `68.472%` iterative, loss `0.311526`, invalid `0.420%`. This is only `+0.630/+0.384` over ep179 and remains far below matched AB ep199 `74.064/75.886` by `-8.802/-7.414`.
+  - `6457` CF sanity reached ep159: `58.016%`, loss `2.066150`. This is below CF ep139 `58.626%` and far below old 6380 ep159 `65.530%`; sanity reproduction remains unresolved.
+  - `6474` AJ RandAug-only latest eval remains ep79 `64.974/68.772`; running around ep91.7 with no errors. Next useful eval is ep99.
+  - `6487` CG old pre-mixup shuffle + exact GELU latest eval remains ep19 `38.094%`; running around ep29.7 with no errors. Next useful eval is ep39.
+  - `6489` CI old pre-mixup shuffle + approximate GELU has eval0 `0.096%` and is running around ep7.35 with no errors. Next useful eval is ep19.
+- Interpretation / decisions:
+  - No resume needed; all effective jobs are actively logging.
+  - No new launch right now. The highest-value pending information is already queued: AJ ep99, CG ep39, CI ep19, and Z post-ep199 trend.
+  - Z is not promoted; full augmentation is still far behind. Keep it to ep219 for now because the user explicitly warned not to kill augmentation branches only for slow convergence, but retire it under slot pressure or if ep219 remains weak.
+  - CF is diagnostic only and is a retirement candidate once CG/CI provide clearer sanity-ablation reads.
+  - Continue enforcing no warm-start / no backbone load / no aux CE; same-run checkpoint resumes only.
+- Updated `agents/report_24h_progress_2026-05-12.html` with Z ep199, CF ep159, and current next-wake plan.
+- Next wake targets: AJ progress toward ep99, CG toward ep39, CI toward ep19, Z health after ep199, CF health after ep159, and continued absence of active forbidden `6459`.
+
+## Manual Loop User Redirect (2026-05-12 23:10-23:13 UTC)
+- User interrupted the sleep loop and changed priority: project due in ~5 hours; stop all current training experiments, write an HTML report, then start inference-budget experiments on ImageNet-1K.
+- Before acting, re-read full agents memory: `/tmp/deit_agents_full_read_20260512_231044.txt` (`5656` lines, sha256 `7890bed19c4eefb3a415b76458a1dc4eb6f3049026b4610a836924ab4dbd43b0`). Re-read `agents/notes.md` as part of full memory read.
+- Unexpected untracked file noticed: `agents/report_in21kp_progress_2026-05-12(1).html`. It was not created by this agent; leave it untouched and write any new report under a different filename.
+- Latest pre-stop log snapshot:
+  - `6457` CF: latest eval ep159 `58.016%`; was running around ep167.13.
+  - `6474` AJ: latest eval ep79 `64.974/68.772`; was running around ep95.27.
+  - `6485` Z: latest eval ep199 `65.262/68.472`; was running around ep203.89.
+  - `6487` CG: latest eval ep19 `38.094%`; was running around ep33.25.
+  - `6489` CI: eval0 `0.096%`; was running around ep10.95.
+- Stop action: ran manager kills for windows `6457`, `6474`, `6485`, `6487`, `6489` using `python /kmh-nfs-ssd-us-mount/code/qiao/work/tpu_manager/tpu.py kill sqa window=<W> user=sqa`.
+- Verification: `/tmp/deit_tpu_check_after_kill_20260512_231203.txt` (`436` lines, sha256 `24ca9286cbde7073acc30b19811a02ec3d835166f57eb0753e6f09d6d7aa82e4`). These five effective DeiT windows are no longer Running, no local tmux windows with those IDs remain, and the previous local PIDs are gone.
+- From this point onward, do not resume/start training jobs unless explicitly requested. The loop focus changes to inference-time experiments and reporting.
+
+## Inference-Budget Pivot Started (2026-05-12 23:18-23:22 UTC)
+- Implemented `inference_score_ablation.py`, an inference-only ImageNet-1K evaluator for AB-style MLP diffusion checkpoints.
+- Scoring formula implemented for a fixed unmask path `S_1..S_T`: `log p(y|x;path)=sum_t sum_{i in S_t} log p_theta(y_i | x, y_{U_{t-1}}, mask_t)`. The script scores all 1000 valid class codes explicitly, avoiding invalid-code clipping in the top-k scorer.
+- Supported path ablations: `all` one-step all-masked; `lsb2/msb2`; `lsb4/msb4`; `lsb10/msb10`; random one-bit orders; and multi-path ensembles such as `lsb4+msb4`.
+- Smoke run on first 128 ImageNet val images passed: `agents/inference_score_ablation_ab_in1k_smoke.json`. Because ImageFolder val is class-sorted, this prefix is not representative; use only as a functionality check.
+- Ensemble smoke run on first 256 val images passed: `agents/inference_score_ablation_ab_in1k_smoke_ensemble.json`. Prefix metrics: all-mask top5 `92.1875%`, lsb4 top5 `98.046875%`, lsb4+msb4 top5 `97.265625%`. Again, not representative due prefix ordering.
+- Full ImageNet-1K val run started in foreground tool session `28411` with batch size 32, methods `all,lsb2,msb2,lsb4,msb4`, and ensembles `lsb2+msb2`, `lsb4+msb4`, `lsb2+lsb4`, `lsb2+msb2+lsb4+msb4`. Output target: `agents/inference_score_ablation_ab_in1k_full.json`.
+- Training jobs remain stopped; do not resume them. Continue loop by monitoring inference run progress and updating reports/results.
+
+## Full Inference Ablation Result #1 (2026-05-12 23:35 UTC)
+- Full ImageNet-1K val AB checkpoint inference scoring finished: `agents/inference_score_ablation_ab_in1k_full.json`, 50,000 images, elapsed `822.18s`, batch size 32.
+- Key metrics:
+  - Current greedy single top1 `76.566%`, invalid `0.276%`.
+  - Current greedy iter4 top1 `78.336%`, invalid `0.004%`.
+  - All-mask explicit 1000-class scoring: top1 `76.584%`, top5 `80.166%`.
+  - `lsb2`: top1 `78.600%`, top5 `85.768%`.
+  - `msb2`: top1 `78.452%`, top5 `85.488%`.
+  - `lsb4`: top1 `78.796%`, top5 `89.636%`.
+  - `msb4`: top1 `78.574%`, top5 `89.066%`.
+  - `lsb4+msb4` ensemble: top1 `78.866%`, top5 `90.126%` (best so far).
+  - 4-path ensemble `lsb2+msb2+lsb4+msb4`: top1 `78.850%`, top5 `88.364%`.
+- Interpretation: explicit per-class probability scoring under a unified fixed mask path massively improves top5 versus all-mask scoring and improves top1 beyond current greedy iter4. Best current top5 is `lsb4+msb4` at `90.126%`.
+- Started second full run for larger inference budget / one-bit paths: `agents/inference_score_ablation_ab_in1k_full_10step.json`, methods `lsb10,msb10,rand0`, ensembles `lsb10+msb10`, `lsb10+rand0`, `lsb10+msb10+rand0`; foreground session `84692`.
+
+## Full Inference Ablation Result #2 (2026-05-12 23:45 UTC)
+- Full one-bit / 10-step ImageNet-1K val run finished: `agents/inference_score_ablation_ab_in1k_full_10step.json`, 50,000 images, elapsed `496.08s`, batch size 32.
+- Metrics:
+  - `lsb10`: top1 `78.820%`, top5 `92.106%`.
+  - `msb10`: top1 `78.750%`, top5 `92.020%`.
+  - `rand0`: top1 `78.838%`, top5 `92.106%`.
+  - `lsb10+msb10`: top1 `78.880%`, top5 `92.432%` (best so far).
+  - `lsb10+rand0`: top1 `78.828%`, top5 `92.218%`.
+  - `lsb10+msb10+rand0`: top1 `78.896%`, top5 `92.390%`.
+- Interpretation: increasing inference budget from 4 chunks to 10 one-bit steps improves top5 from best 4-step ensemble `90.126%` to best 10-step ensemble `92.432%`, with small top1 gains as well. Path dependence is real but modest across lsb/msb/random at 10 steps.
+- Started third full run to test larger path ensemble: `agents/inference_score_ablation_ab_in1k_full_10step_5path.json`, methods `lsb10,msb10,rand0,rand1,rand2`, ensembles `rand0+rand1+rand2` and `lsb10+msb10+rand0+rand1+rand2`; foreground session `1999`.
+
+## Full Inference Ablation Result #3 (2026-05-12 23:56 UTC)
+- Full 5-path one-bit / 10-step ImageNet-1K val run finished: `agents/inference_score_ablation_ab_in1k_full_10step_5path.json`, 50,000 images, elapsed `553.22s`, batch size 32.
+- Metrics:
+  - `rand1`: top1 `78.824%`, top5 `92.072%`.
+  - `rand2`: top1 `78.688%`, top5 `92.128%`.
+  - `rand0+rand1+rand2`: top1 `78.862%`, top5 `92.450%`.
+  - `lsb10+msb10+rand0+rand1+rand2`: top1 `78.896%`, top5 `92.502%` (best so far).
+- Comparison:
+  - DeiT-B 224 no-distill baseline reported top1/top5 is `81.8% / 95.6%` (HF model card / original paper table lineage). Our best inference-time top5 is now `92.502%`, still `-3.098` from DeiT-B top5 while top1 is `-2.904` from DeiT-B top1.
+  - Increasing from all-mask class scoring top5 `80.166%` to best 10-step 5-path top5 `92.502%` is a huge `+12.336` top5 improvement at inference time.
+  - Increasing from best 10-step 2-path top5 `92.432%` to 5-path top5 `92.502%` only adds `+0.070`, so path-ensemble marginal return is already small for this AB checkpoint.
+
+## Full Inference Ablation Result #4 (2026-05-13 00:08 UTC)
+- Ensemble formula ablation finished: `agents/inference_score_ablation_ab_in1k_full_10step_5path_lme.json`, 50,000 images, elapsed `557.10s`.
+- For 5-path ensemble `lsb10+msb10+rand0+rand1+rand2`:
+  - mean-log / geometric path aggregation: top1 `78.896%`, top5 `92.502%`.
+  - `logmeanexp` / arithmetic path marginal likelihood: top1 `78.914%`, top5 `92.370%`.
+  - `maxpath` optimistic aggregation: top1 `78.886%`, top5 `92.186%`.
+- For random-only 3-path ensemble:
+  - mean-log: top1 `78.862%`, top5 `92.450%`.
+  - logmeanexp: top1 `78.846%`, top5 `92.340%`.
+  - maxpath: top1 `78.818%`, top5 `92.204%`.
+- Interpretation: if optimizing top5, mean-log path aggregation is empirically best so far even though `logmeanexp` is the natural latent-path marginal likelihood. If optimizing top1 only, `logmeanexp` is the current best at `78.914%`, but its top5 is lower.
+
+## Full Inference Ablation Result #5 (2026-05-13 00:21 UTC)
+- Rank/RRF aggregation full-val run finished: `agents/inference_score_ablation_ab_in1k_full_10step_5path_rank.json`, 50,000 images, elapsed `559.66s`.
+- For 5-path ensemble `lsb10+msb10+rand0+rand1+rand2`:
+  - mean-log: top1 `78.896%`, top5 `92.502%`.
+  - logmeanexp: top1 `78.914%`, top5 `92.370%`.
+  - maxpath: top1 `78.886%`, top5 `92.186%`.
+  - rankmean: top1 `78.844%`, top5 `92.554%`.
+  - RRF: top1 `78.840%`, top5 `92.556%` (best current top5).
+- Interpretation: ranking-based path aggregation is slightly better for top5 than probability aggregation, suggesting path scores are not perfectly calibrated across mask processes. Current best top5 is RRF `92.556%`; current best top1 remains logmeanexp `78.914%`.
+
+## Larger Inference-Budget Run Started (2026-05-13 00:22 UTC)
+- Updated `agents/report_inference_budget_2026-05-12.html` with current best top5 `92.556%` (5-path RRF) and best top1 `78.914%` (5-path logmeanexp).
+- Started a larger full-val 12-path 10-step ablation in foreground session `97768`:
+  - methods: `lsb10,msb10,rand0,rand1,rand2,rand3,rand4,rand5,rand6,rand7,rand8,rand9`.
+  - ensembles: random10 and lsb/msb+random10.
+  - output: `agents/inference_score_ablation_ab_in1k_full_10step_12path_rank.json`.
+- Purpose: test whether rank/RRF top5 continues improving with larger path ensemble budget beyond 5 paths.
+
+## Manual Loop Wake / Continue (2026-05-13 00:30 UTC)
+- User said continue loop. Per loop rule, re-read full `agents/` first: `/tmp/deit_agents_full_read_20260513_003022.txt` (`6488` lines, sha256 `fb9c1a895f865f9f899aced40ff74e16cb70a7d15ae9c0ef2cdb64c7b3c8de5e`). Re-read `agents/notes.md` as part of the full memory read.
+- Training state check: `/tmp/deit_tpu_check_loop_20260513_003033.txt` (`421` lines, sha256 `bc050a154d2ea1d25ad81a9ced83eb0a9de6f290fc5acdb1ea0a2aa1d2294090`). Effective training windows `6457`, `6474`, `6485`, `6487`, `6489` are not Running. Keep training stopped.
+- Current inference status: previous 12-path run `agents/inference_score_ablation_ab_in1k_full_10step_12path_rank.json` has no output file and no live `inference_score_ablation.py` process. Treat it as interrupted by the user abort; relaunch is needed if we still want the 12-path budget result.
+- Decision: relaunch 12-path full ImageNet-1K inference-budget ablation in foreground, then update memory/report before the next manual `sleep 1800`.
+
+## Full Inference Ablation Result #6 (2026-05-13 00:44 UTC)
+- 12-path larger inference-budget full-val run finished: `agents/inference_score_ablation_ab_in1k_full_10step_12path_rank.json`, 50,000 images, elapsed `736.41s`.
+- Best 12-path metrics:
+  - random10 rankmean: top1 `78.860%`, top5 `92.684%` (best current top5).
+  - random10 RRF: top1 `78.862%`, top5 `92.664%`.
+  - random10 mean-log: top1 `78.874%`, top5 `92.590%`.
+  - random10 logmeanexp: top1 `78.872%`, top5 `92.464%`.
+  - lsb10+msb10+random10 rankmean: top1 `78.874%`, top5 `92.650%`.
+  - lsb10+msb10+random10 RRF: top1 `78.870%`, top5 `92.630%`.
+  - lsb10+msb10+random10 logmeanexp: top1 `78.900%`, top5 `92.448%`.
+  - lsb10+msb10+random10 maxpath: top1 `78.916%`, top5 `92.210%` (best current top1, but lower top5).
+- Interpretation:
+  - Larger path budget continues improving top5: best 5-path top5 `92.556%` -> best 12-path top5 `92.684%` (+0.128).
+  - Top5 best uses rank aggregation rather than probability aggregation, consistent with path-score calibration mismatch.
+  - Top1 best is now maxpath over 12 paths at `78.916%`, only +0.002 over 5-path logmeanexp `78.914%`, so top1 is saturated.
+  - Compared with DeiT-B 224 no-distill `81.8/95.6`, current best top5 gap is `95.6 - 92.684 = 2.916` points; best top1 gap is `81.8 - 78.916 = 2.884` points.
+
+## Larger Inference-Budget Run Started (2026-05-13 00:45 UTC)
+- After 12-path result, launched a 20-random-path one-bit 10-step full ImageNet-1K val ablation in foreground session `6258`.
+- Output target: `agents/inference_score_ablation_ab_in1k_full_10step_20path_rank.json`.
+- Purpose: test scaling beyond current best random10 rankmean top5 `92.684%` and quantify diminishing returns of path count.
+
+## Full Inference Ablation Result #7 (2026-05-13 01:01 UTC)
+- 20-random-path larger inference-budget full-val run finished: `agents/inference_score_ablation_ab_in1k_full_10step_20path_rank.json`, 50,000 images, elapsed `908.38s`.
+- Metrics for random20 ensemble:
+  - rankmean: top1 `78.868%`, top5 `92.734%` (best current top5).
+  - RRF: top1 `78.876%`, top5 `92.696%`.
+  - mean-log: top1 `78.870%`, top5 `92.602%`.
+  - logmeanexp: top1 `78.868%`, top5 `92.456%`.
+  - maxpath: top1 `78.878%`, top5 `92.228%`.
+- Interpretation:
+  - Increasing path count still improves top5, but diminishing returns are strong: 5-path `92.556%`, 10-random/12-path `92.684%`, 20-random `92.734%`.
+  - Best top5 gap to DeiT-B 224 no-distill top5 `95.6%` is now `2.866` points.
+  - Top1 remains saturated around `78.9%`; best observed top1 remains 12-path mixed maxpath `78.916%`, and random20 maxpath is `78.878%`.
+- Decision: no more training; no immediate need to run even larger path budget unless user explicitly asks. Next loop can either sleep/check, or run targeted top-k candidate / calibration experiments if time remains.
+
+## Manual Loop Sleep Decision (2026-05-13 01:03 UTC)
+- Verified no live `inference_score_ablation.py` process and no live `sleep 1800` process before starting the next sleep.
+- Verified effective training windows `6457`, `6474`, `6485`, `6487`, `6489` are not active in local tmux listing.
+- Current best inference result is random20 rankmean top5 `92.734%`; marginal gain over random10 rankmean is only `+0.050`, so do not launch an even larger blind path-count run before the next wake.
+- Next wake targets: re-read all `agents/`, confirm no accidental training resume, review whether to run targeted inference calibration/top-k-candidate experiments rather than more raw path-count scaling, and keep report updated.
+
+## Inference Progress Report Written (2026-05-13 01:10 UTC)
+- User asked whether inference experiments are done and requested a report.
+- Interrupted/killed the pending manual sleep process; no inference or training job was active afterward.
+- Re-read full agents memory first: `/tmp/deit_agents_full_read_20260513_010838.txt` (`6785` lines, sha256 `e71a9e2df0dab4792827295d3277b8ab4aba1b1053e43a2c86da86b1b3c3dcbb`).
+- Wrote new focused HTML report: `agents/report_inference_progress_2026-05-13.html`.
+- Current status summarized in report: core inference-budget sweep complete through random20 rank aggregation; best top5 `92.734%`; best top1 `78.916%`; remaining gap to DeiT-B 224 no-distill `81.8/95.6` is `2.884` top1 and `2.866` top5.
+
+## Inference Report Detail Update (2026-05-13 01:11 UTC)
+- User asked to make the report more concrete about the implementation of the best inference result.
+- Updated `agents/report_inference_progress_2026-05-13.html` with a new "Best Method Implementation" section.
+- The new section documents the exact random20 one-bit path generation, class-code scoring loop, rankmean aggregation, compute budget, no-invalid-code property, and the exact command that produced `92.734%` top5.

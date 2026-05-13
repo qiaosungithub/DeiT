@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDH Inference-Budget Report</title>
+  <style>
+    :root { --bg:#f4efe1; --paper:#fffaf0; --ink:#20241f; --muted:#667069; --line:#d7c7ab; --accent:#0b6b5d; --accent2:#9a4f0f; --good:#166534; --code:#efe4cf; }
+    body { margin:0; color:var(--ink); font-family:"Aptos","Source Han Sans SC","PingFang SC",sans-serif; line-height:1.55; background:radial-gradient(circle at 0 0,rgba(11,107,93,.18),transparent 30rem),radial-gradient(circle at 100% 10%,rgba(154,79,15,.12),transparent 28rem),linear-gradient(140deg,#fbf4e6,#eef7f1 58%,#f8efdf); }
+    .wrap { max-width:1180px; margin:0 auto; padding:34px 18px 70px; }
+    .hero,.card { background:rgba(255,250,240,.96); border:1px solid var(--line); border-radius:18px; box-shadow:0 12px 34px rgba(71,52,24,.08); }
+    .hero { padding:26px 30px; margin-bottom:16px; }
+    .card { padding:18px 22px; margin:14px 0; }
+    h1 { margin:0 0 8px; font-size:34px; line-height:1.14; letter-spacing:-.02em; }
+    h2 { margin:0 0 10px; font-size:21px; color:var(--accent); }
+    p { margin:7px 0; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+    th,td { border:1px solid var(--line); padding:8px 9px; text-align:left; vertical-align:top; }
+    th { background:#efe3cf; }
+    code { background:var(--code); border:1px solid #ddceb6; border-radius:6px; padding:1px 5px; font-family:"Cascadia Mono",Consolas,monospace; font-size:12px; }
+    pre { background:#202017; color:#fbf7e9; padding:14px; border-radius:12px; overflow:auto; font-size:12px; }
+    .good { color:var(--good); font-weight:700; }
+    .muted { color:var(--muted); }
+  </style>
+</head>
+<body><div class="wrap">
+  <section class="hero">
+    <h1>Masked Diffusion Head: Inference-Budget Report</h1>
+    <p><strong>Generated:</strong> 2026-05-13 01:01 UTC. <strong>Checkpoint:</strong> AB ep319, ImageNet-1K, no CE warm-start / no aux CE.</p>
+    <p><strong>Main result:</strong> explicit 1000-class path scoring raises top-5 from all-mask <strong>80.166%</strong> to <span class="good">92.734%</span> with 10-step 20-path rank scoring.</p>
+  </section>
+
+  <section class="card">
+    <h2>1. Baseline Reference</h2>
+    <p>DeiT-B / DeiT-base patch16 224, no distillation, reports ImageNet-1K <strong>81.8%</strong> top-1 and <strong>95.6%</strong> top-5. Source: <a href="https://huggingface.co/facebook/deit-base-patch16-224">facebook/deit-base-patch16-224 model card</a>.</p>
+    <p>Our best current top-5 inference result is <code>78.868 / 92.734</code> with random20 rank aggregation, so the remaining top-5 gap to that DeiT-B reference is <code>-2.866</code>. The best current top-1 result is <code>78.916</code>, leaving <code>-2.884</code> top-1.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. Scoring Formula</h2>
+    <p>For a class code <code>y</code> and fixed unmask path <code>S_1...S_T</code>, score all 1000 legal ImageNet classes explicitly:</p>
+    <pre><code>log p_theta(y | x; path) = sum_t sum_{i in S_t} log p_theta(y_i | x, y_{U_{t-1}}, mask_t)
+U_{t-1} = S_1 union ... union S_{t-1}</code></pre>
+    <p>This unifies the mask process during scoring. Path dependence is real, so we ablate LSB-first, MSB-first, random fixed paths, and path ensembles.</p>
+  </section>
+
+  <section class="card">
+    <h2>3. Full-Val Results</h2>
+    <table>
+      <tr><th>Method</th><th>Top-1</th><th>Top-5</th><th>Notes</th></tr>
+      <tr><td>Greedy single-bit argmax</td><td>76.566</td><td>not available</td><td>Current all-mask greedy top1; invalid 0.276%</td></tr>
+      <tr><td>Greedy 4-step confidence</td><td>78.336</td><td>not available</td><td>Current iterative decode top1; invalid 0.004%</td></tr>
+      <tr><td>All-mask explicit class scoring</td><td>76.584</td><td>80.166</td><td>One model call per image, score 1000 class codes with all bits masked</td></tr>
+      <tr><td>LSB 2 chunks</td><td>78.600</td><td>85.768</td><td>Large top5 gain from sequential scoring</td></tr>
+      <tr><td>MSB 2 chunks</td><td>78.452</td><td>85.488</td><td>Similar to LSB 2 chunks</td></tr>
+      <tr><td>LSB 4 chunks</td><td>78.796</td><td>89.636</td><td>Best single 4-chunk path</td></tr>
+      <tr><td>MSB 4 chunks</td><td>78.574</td><td>89.066</td><td>Path order matters modestly</td></tr>
+      <tr><td>LSB4 + MSB4</td><td>78.866</td><td>90.126</td><td>Best 4-chunk ensemble</td></tr>
+      <tr><td>LSB 10 one-bit path</td><td>78.820</td><td>92.106</td><td>More inference budget improves top5</td></tr>
+      <tr><td>MSB 10 one-bit path</td><td>78.750</td><td>92.020</td><td>Close to LSB 10</td></tr>
+      <tr><td>Random 10 one-bit path</td><td>78.838</td><td>92.106</td><td>Path choice has small variance at 10 steps</td></tr>
+      <tr><td>LSB10 + MSB10</td><td>78.880</td><td>92.432</td><td>Best 2-path 10-step ensemble</td></tr>
+      <tr><td>Rand0 + Rand1 + Rand2</td><td>78.862</td><td>92.450</td><td>Random path ensemble</td></tr>
+      <tr><td>LSB10 + MSB10 + Rand0 + Rand1 + Rand2</td><td>78.896</td><td><strong>92.502</strong></td><td>Best current top-5 result with mean-log path aggregation</td></tr>
+      <tr><td>Same 5 paths, logmeanexp aggregation</td><td><strong>78.914</strong></td><td>92.370</td><td>Natural latent-path marginal likelihood; best current top-1 but worse top-5</td></tr>
+      <tr><td>Same 5 paths, maxpath aggregation</td><td>78.886</td><td>92.186</td><td>Optimistic aggregation diagnostic; worse than mean-log</td></tr>
+      <tr><td>Same 5 paths, rankmean aggregation</td><td>78.844</td><td>92.554</td><td>Calibration-light rank aggregation</td></tr>
+      <tr><td>Same 5 paths, RRF aggregation</td><td>78.840</td><td>92.556</td><td>Best 5-path top-5 result</td></tr>
+      <tr><td>Random10, rankmean aggregation</td><td>78.860</td><td>92.684</td><td>Best 10-random-path top-5 result</td></tr>
+      <tr><td>Random20, rankmean aggregation</td><td>78.868</td><td><strong>92.734</strong></td><td>Best current top-5 result</td></tr>
+      <tr><td>LSB10 + MSB10 + Random10, rankmean aggregation</td><td>78.874</td><td>92.650</td><td>Best mixed deterministic/random 12-path top-5</td></tr>
+      <tr><td>LSB10 + MSB10 + Random10, maxpath aggregation</td><td><strong>78.916</strong></td><td>92.210</td><td>Best current top-1 but weaker top-5</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>4. Interpretation</h2>
+    <p>Explicit per-class scoring is the right direction for large inference budget. The gain is mostly top-5: all-mask top5 <code>80.166</code> to one-bit multi-path top5 <code>92.734</code>, a <code>+12.568</code> point jump without any training.</p>
+    <p>Increasing path granularity from 4 chunks to 10 one-bit steps gives a real top5 gain: best 4-step top5 <code>90.126</code> to best 10-step top5 <code>92.734</code>. Adding more paths has diminishing but nonzero return: 2-path <code>92.432</code>, 5-path <code>92.556</code>, 10-random/12-path <code>92.684</code>, 20-random <code>92.734</code>. For top-5, rankmean aggregation is currently best; top-1 is saturated around <code>78.9</code>.</p>
+  </section>
+</div></body></html>

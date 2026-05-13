@@ -5,7 +5,7 @@
 model: ViT_base_v3
 load_from: ''
 load_backbone_from: ''
-gelu_approximate: true
+gelu_approximate: false
 
 dataset:
     num_workers: 16
@@ -43,7 +43,7 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
-    wandb_notes: 'sanity-run CI: ViT_base_v3 old pre-mixup shuffle + approximate GELU; no warm-start'
+    wandb_notes: 'sanity-run CG: ViT_base_v3 current code + old pre-mixup shuffle; exact GELU; no warm-start'
     wandb_tags:
         - sqa
         - phase1-sanity

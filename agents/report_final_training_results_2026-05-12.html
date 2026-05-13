@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeiT Masked Diffusion Head Final Training Report</title>
+  <style>
+    :root {
+      --bg: #f5efe2;
+      --paper: #fffaf0;
+      --ink: #1e2420;
+      --muted: #626d67;
+      --line: #d8cab1;
+      --accent: #0b6b5d;
+      --accent2: #9a4f0f;
+      --good: #166534;
+      --warn: #a16207;
+      --bad: #9f1239;
+      --code: #efe4cf;
+    }
+    body { margin: 0; font-family: "Aptos", "Source Han Sans SC", "PingFang SC", sans-serif; color: var(--ink); background: radial-gradient(circle at 8% 8%, rgba(11,107,93,.17), transparent 30rem), radial-gradient(circle at 100% 0%, rgba(154,79,15,.13), transparent 26rem), linear-gradient(145deg, #fbf4e6, #edf6f2 55%, #f7efe0); line-height: 1.55; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 34px 18px 72px; }
+    .hero, .card { background: rgba(255,250,240,.96); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 12px 34px rgba(71,52,24,.08); }
+    .hero { padding: 26px 30px; margin-bottom: 16px; }
+    .card { padding: 18px 22px; margin: 14px 0; }
+    h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.14; letter-spacing: -.02em; }
+    h2 { margin: 0 0 10px; font-size: 21px; color: var(--accent); }
+    h3 { margin: 14px 0 8px; font-size: 16px; color: var(--accent2); }
+    p { margin: 7px 0; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    th, td { border: 1px solid var(--line); padding: 8px 9px; text-align: left; vertical-align: top; }
+    th { background: #efe3cf; }
+    code { background: var(--code); border: 1px solid #ddceb6; border-radius: 6px; padding: 1px 5px; font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+    pre { background: #202017; color: #fbf7e9; padding: 14px; border-radius: 12px; overflow: auto; font-size: 12px; }
+    .pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; margin: 2px 4px 2px 0; background: #f3ead8; font-size: 12px; }
+    .good { color: var(--good); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <h1>DeiT Masked Diffusion Head: Final Training Report</h1>
+    <p><strong>Generated:</strong> 2026-05-12 23:13 UTC. <strong>Status:</strong> all active training experiments were stopped on user request before the inference-budget pivot.</p>
+    <p><strong>Main conclusion:</strong> the strongest faithful pure masked-diffusion configuration is <span class="good">Run AB</span>: K80, low augmentation, corrected mixup/cutmix target allocation, MLP tiny-bit head, no CE shortcut. It reached <strong>76.600%</strong> single-step and <strong>78.294%</strong> iterative ImageNet-1K accuracy at epoch 319.</p>
+    <p><span class="pill">No CE warm-start</span><span class="pill">No <code>load_backbone_from</code></span><span class="pill">No auxiliary CE loss</span><span class="pill">Same-run checkpoint resume only</span></p>
+  </section>
+
+  <section class="card">
+    <h2>1. Final Active-Run Stop Snapshot</h2>
+    <table>
+      <tr><th>Window</th><th>Run</th><th>Final useful eval before stop</th><th>State just before stop</th><th>Action</th></tr>
+      <tr><td>6457</td><td>CF CE sanity, current fixes</td><td>ep159 <code>58.016%</code>, loss <code>2.066150</code></td><td>running around ep167.13</td><td>Stopped</td></tr>
+      <tr><td>6474</td><td>AJ K80 RandAug-only + AB-style mix/cut <code>soft_top2</code></td><td>ep79 <code>64.974 / 68.772</code>, loss <code>0.288021</code>, invalid <code>0.674%</code></td><td>running around ep95.27</td><td>Stopped</td></tr>
+      <tr><td>6485</td><td>Z K80 full baseline augmentation + mix/cut <code>soft_top2</code></td><td>ep199 <code>65.262 / 68.472</code>, loss <code>0.311526</code>, invalid <code>0.420%</code></td><td>running around ep203.89</td><td>Stopped</td></tr>
+      <tr><td>6487</td><td>CG CE sanity, old pre-mixup shuffle + exact GELU</td><td>ep19 <code>38.094%</code>, loss <code>3.025813</code></td><td>running around ep33.25</td><td>Stopped</td></tr>
+      <tr><td>6489</td><td>CI CE sanity, old pre-mixup shuffle + approximate GELU</td><td>eval0 <code>0.096%</code></td><td>running around ep10.95</td><td>Stopped</td></tr>
+    </table>
+    <p class="muted">Stop verification: manager snapshot <code>/tmp/deit_tpu_check_after_kill_20260512_231203.txt</code>; no effective DeiT training window remained Running.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. Best Configuration To Reconstruct</h2>
+    <p>Use Run AB as the current handoff recipe. This is the best no-shortcut result and the safest base for ImageNet-22K scale-up.</p>
+    <table>
+      <tr><th>Component</th><th>Setting</th></tr>
+      <tr><td>Model</td><td><code>ViT_base_mdh_mlp</code></td></tr>
+      <tr><td>Diffusion head</td><td>MLP tiny-bit head, <code>head_bit_dim=8</code>, hidden dim <code>3072</code>, <code>head_n_layers=2</code>, GELU, no head LayerNorm</td></tr>
+      <tr><td>Code / masks</td><td>ImageNet-1K uses <code>n_bits=10</code>; <code>n_masks_per_image=80</code>; <code>mask_schedule=uniform</code>; <code>eval_iter_steps=4</code></td></tr>
+      <tr><td>Loss</td><td>masked bit cross-entropy only; no class-logit CE head</td></tr>
+      <tr><td>Mix/Cut labels</td><td><code>diffusion_label_mode=soft_top2</code>; split K repeated targets between the two mixed labels according to mix/cut weights</td></tr>
+      <tr><td>Augmentation</td><td>low augmentation: no RandAugment, no random erasing, repeated aug 1; mixup alpha 0.8, cutmix alpha 1.0, switch prob 0.5</td></tr>
+      <tr><td>Optimizer</td><td>AdamW, LR <code>5e-4</code>, <code>adamw_b2=0.95</code>, weight decay <code>0.02</code>, batch size <code>1024</code>, epochs <code>330</code></td></tr>
+      <tr><td>Regularization</td><td>dropout 0.0, stochastic depth 0.05</td></tr>
+      <tr><td>Forbidden shortcuts</td><td><code>load_backbone_from=''</code>, <code>head_aux_ce=false</code>, <code>aux_ce_loss_weight=0.0</code>, no CE warm-start</td></tr>
+      <tr><td>AB logdir</td><td><code>/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval</code></td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>3. AB Learning Curve</h2>
+    <table>
+      <tr><th>Epoch</th><th>Single-step</th><th>Iterative</th><th>Loss</th><th>Invalid</th><th>Interpretation</th></tr>
+      <tr><td>59</td><td>64.890</td><td>68.616</td><td>0.293254</td><td>0.576</td><td>First strong K80 read</td></tr>
+      <tr><td>99</td><td>70.380</td><td>73.076</td><td>0.262941</td><td>0.424</td><td>Clear best early branch</td></tr>
+      <tr><td>159</td><td>73.496</td><td>75.538</td><td>0.253380</td><td>0.338</td><td>Still climbing</td></tr>
+      <tr><td>199</td><td>74.064</td><td>75.886</td><td>0.257361</td><td>0.290</td><td>Matched point used for Z comparison</td></tr>
+      <tr><td>219</td><td>74.726</td><td>76.526</td><td>0.255938</td><td>0.298</td><td>Mature improvement continues</td></tr>
+      <tr><td>259</td><td>75.758</td><td>77.414</td><td>0.256073</td><td>0.250</td><td>Strong mature branch</td></tr>
+      <tr><td>299</td><td>76.266</td><td>77.988</td><td>0.252067</td><td>0.260</td><td>Beats AH at matched epoch</td></tr>
+      <tr><td>319</td><td><strong>76.600</strong></td><td><strong>78.294</strong></td><td><strong>0.248487</strong></td><td>0.274</td><td>Best useful eval</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>4. Main Ablation Matrix</h2>
+    <table>
+      <tr><th>Run</th><th>Design</th><th>Best / latest useful result</th><th>Conclusion</th></tr>
+      <tr><td>AB / 6435</td><td>K80 low aug + corrected mix/cut labels</td><td><strong>ep319 76.600 / 78.294</strong></td><td class="good">Best deployable pure-diffusion config</td></tr>
+      <tr><td>AH / 6448</td><td>K80 low aug, cutmix-heavy p=0.75</td><td>ep299 76.066 / 77.674</td><td>Close, but below matched AB ep299 and AB ep319</td></tr>
+      <tr><td>AL / 6483</td><td>AB own-checkpoint continuation, lower LR</td><td>ep339 75.758 / 77.562</td><td>Negative continuation signal</td></tr>
+      <tr><td>AF / 6441</td><td>K80 low aug, cutmix-only</td><td>ep199 73.162 / 74.960</td><td>Dominated by AB</td></tr>
+      <tr><td>AJ / 6474</td><td>K80 RandAug-only + AB-style mix/cut</td><td>ep79 64.974 / 68.772</td><td>Recovering, but still below AB matched ep79 68.464 / 71.404</td></tr>
+      <tr><td>Z / 6485</td><td>K80 full baseline augmentation + mix/cut</td><td>ep199 65.262 / 68.472</td><td>Delayed catch-up exists but still far behind AB matched ep199 74.064 / 75.886</td></tr>
+      <tr><td>S / 6433</td><td>K10 full baseline augmentation + mix/cut</td><td>ep319 69.324 / 72.296</td><td>Too weak versus K80 low aug</td></tr>
+      <tr><td>CF / 6457</td><td>CE sanity current fixes</td><td>ep159 58.016</td><td>Sanity reproduction not closed</td></tr>
+      <tr><td>CG / 6487</td><td>CE sanity old pre-mixup shuffle</td><td>ep19 38.094</td><td>Closer to old ep19 38.770 but not enough yet</td></tr>
+      <tr><td>CH / 6488</td><td>CE sanity approximate GELU only</td><td>ep19 36.320</td><td>Worse; retired</td></tr>
+      <tr><td>CI / 6489</td><td>CE sanity old shuffle + approximate GELU</td><td>eval0 0.096; ran to ep10.95 before stop</td><td>Stopped before first useful eval due project pivot</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>5. Scientific Takeaways</h2>
+    <ul>
+      <li><strong>K matters:</strong> increasing from K10 to K80 was the major win; AB K80 substantially beats S K10 even with the same full-mix/cut label correction idea.</li>
+      <li><strong>Correct mix/cut supervision matters:</strong> mixed images must not be collapsed to a single hard argmax target. The K repeated masked-bit targets should be allocated to the two top labels.</li>
+      <li><strong>Full augmentation is not competitive in the current horizon:</strong> Z improved from ep179 to ep199, but remained <code>-8.802 / -7.414</code> behind AB at matched ep199.</li>
+      <li><strong>Medium augmentation may recover but is still late:</strong> AJ improves rapidly after ep39, but at ep79 remains below AB by <code>-3.490 / -2.632</code>.</li>
+      <li><strong>CE sanity remains an open risk:</strong> the old 6380 CE sanity reached ep159 <code>65.530</code>; CF current fixes reached only <code>58.016</code>. Pre-mixup shuffle helps ep19 slightly; approximate GELU alone hurts.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>6. Immediate Inference Pivot</h2>
+    <p>Training is paused. The next high-value direction is inference-time scoring on the AB checkpoint: explicitly score candidate class codes under a fixed masked-unmask path and increase inference budget beyond the current logarithmic/top-code style decoder.</p>
+    <p>Candidate formula for a class code <code>y</code> and a fixed unmask path <code>S_1, ..., S_T</code>:</p>
+    <pre><code>log p_theta(y | x; path) = sum_t sum_{i in S_t} log p_theta(y_i | x, y_{U_{t-1}}, mask_t)
+U_{t-1} = S_1 union ... union S_{t-1}</code></pre>
+    <p>Because masked diffusion is path-dependent, inference experiments should ablate path choice: one-shot all-masked scoring, MSB-to-LSB, LSB-to-MSB, random fixed paths, confidence-based greedy paths, and multi-path averaging.</p>
+  </section>
+</div>
+</body>
+</html>

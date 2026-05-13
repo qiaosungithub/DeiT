@@ -1,0 +1,53 @@
+{
+  "batch_size": 32,
+  "config_mode": "remote_run_AB_mlp_k80_lowaug_mixlabel",
+  "elapsed_sec": 43.36797499656677,
+  "ensembles": [
+    [
+      "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2",
+      [
+        "lsb10",
+        "msb10",
+        "rand0",
+        "rand1",
+        "rand2"
+      ]
+    ]
+  ],
+  "load_from": "/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval",
+  "max_examples": 512,
+  "methods": [
+    "lsb10",
+    "msb10",
+    "rand0",
+    "rand1",
+    "rand2"
+  ],
+  "metrics": {
+    "greedy_iter4_invalid": 0.0,
+    "greedy_iter4_top1": 0.873046875,
+    "greedy_single_invalid": 0.0,
+    "greedy_single_top1": 0.865234375,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_logmeanexp_top1": 0.875,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_logmeanexp_top5": 0.982421875,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_maxpath_top1": 0.876953125,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_maxpath_top5": 0.98046875,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_rankmean_top1": 0.873046875,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_rankmean_top5": 0.982421875,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_rrf_top1": 0.873046875,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_rrf_top5": 0.98046875,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_top1": 0.875,
+    "lsb10_plus_msb10_plus_rand0_plus_rand1_plus_rand2_top5": 0.982421875,
+    "lsb10_top1": 0.873046875,
+    "lsb10_top5": 0.978515625,
+    "msb10_top1": 0.8828125,
+    "msb10_top5": 0.984375,
+    "rand0_top1": 0.873046875,
+    "rand0_top5": 0.9765625,
+    "rand1_top1": 0.869140625,
+    "rand1_top5": 0.978515625,
+    "rand2_top1": 0.876953125,
+    "rand2_top5": 0.978515625
+  },
+  "n_valid": 512
+}

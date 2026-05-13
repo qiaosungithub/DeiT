@@ -1,0 +1,71 @@
+{
+  "batch_size": 32,
+  "config_mode": "remote_run_AB_mlp_k80_lowaug_mixlabel",
+  "elapsed_sec": 28.239393949508667,
+  "ensembles": [
+    [
+      "lsb2_plus_msb2",
+      [
+        "lsb2",
+        "msb2"
+      ]
+    ],
+    [
+      "lsb4_plus_msb4",
+      [
+        "lsb4",
+        "msb4"
+      ]
+    ],
+    [
+      "lsb2_plus_lsb4",
+      [
+        "lsb2",
+        "lsb4"
+      ]
+    ],
+    [
+      "lsb2_plus_msb2_plus_lsb4_plus_msb4",
+      [
+        "lsb2",
+        "msb2",
+        "lsb4",
+        "msb4"
+      ]
+    ]
+  ],
+  "load_from": "/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval",
+  "max_examples": 256,
+  "methods": [
+    "all",
+    "lsb2",
+    "msb2",
+    "lsb4",
+    "msb4"
+  ],
+  "metrics": {
+    "all_top1": 0.87890625,
+    "all_top5": 0.921875,
+    "greedy_iter4_invalid": 0.0,
+    "greedy_iter4_top1": 0.88671875,
+    "greedy_single_invalid": 0.0,
+    "greedy_single_top1": 0.87890625,
+    "lsb2_plus_lsb4_top1": 0.890625,
+    "lsb2_plus_lsb4_top5": 0.97265625,
+    "lsb2_plus_msb2_plus_lsb4_plus_msb4_top1": 0.88671875,
+    "lsb2_plus_msb2_plus_lsb4_plus_msb4_top5": 0.96875,
+    "lsb2_plus_msb2_top1": 0.88671875,
+    "lsb2_plus_msb2_top5": 0.96484375,
+    "lsb2_top1": 0.890625,
+    "lsb2_top5": 0.9609375,
+    "lsb4_plus_msb4_top1": 0.890625,
+    "lsb4_plus_msb4_top5": 0.97265625,
+    "lsb4_top1": 0.88671875,
+    "lsb4_top5": 0.98046875,
+    "msb2_top1": 0.87890625,
+    "msb2_top5": 0.95703125,
+    "msb4_top1": 0.890625,
+    "msb4_top5": 0.96484375
+  },
+  "n_valid": 256
+}

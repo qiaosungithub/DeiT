@@ -595,6 +595,7 @@ def train_and_evaluate(
     head_mlp_hidden_dim=config.get('head_mlp_hidden_dim', 3072),
     head_mlp_activation=config.get('head_mlp_activation', 'gelu'),
     head_mlp_layer_norm=config.get('head_mlp_layer_norm', False),
+    gelu_approximate=config.get('gelu_approximate', False),
     head_n_layers=config.get('head_n_layers', 2),
     head_n_heads=config.get('head_n_heads', 4),
     head_type=config.get('head_type', 'attention'),

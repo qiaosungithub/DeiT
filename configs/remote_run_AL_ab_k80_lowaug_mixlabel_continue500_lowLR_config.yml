@@ -1,0 +1,70 @@
+# Phase 2 Run AL: continue AB from its own diffusion checkpoint with lower LR.
+# Purpose: AB was still improving at the final useful eval (ep319), so test whether
+# the same no-shortcut recipe benefits from more training without a CE warm-start.
+# This is same-run checkpoint continuation from AB, not backbone warm-start / 投敌.
+
+model: ViT_base_mdh_mlp
+load_from: '/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval'
+load_backbone_from: ''
+
+dataset:
+    num_workers: 16
+    prefetch_factor: 4
+
+    use_rand_augment: false
+    rand_augment: rand-m9-mstd0.5-inc1
+    reprob: 0.0
+
+    use_mixup_cutmix: true
+    mixup_prob: 1.0
+    switch_prob: 0.5
+    mixup_alpha: 0.8
+    cutmix_alpha: 1.0
+
+    repeated_aug: 1
+    label_smoothing: 0.1
+    num_tpus: 8
+
+batch_size: 1024
+learning_rate: 0.0001
+num_epochs: 500
+log_per_step: 100
+
+optimizer: adamw
+weight_decay: 0.02
+adamw_b2: 0.95
+dropout_rate: 0.0
+stochastic_depth_rate: 0.05
+grad_norm_clip: null
+
+use_diffusion_head: true
+head_type: mlp
+head_bit_dim: 8
+head_mlp_hidden_dim: 3072
+head_mlp_activation: gelu
+head_mlp_layer_norm: false
+head_n_layers: 2
+mask_schedule: uniform
+diffusion_label_mode: soft_top2
+eval_iter_steps: 4
+n_masks_per_image: 80
+head_aux_ce: false
+aux_ce_loss_weight: 0.0
+
+logging:
+    use_wandb: True
+    wandb_project: 'deit'
+    wandb_entity: 'sqa24-massachusetts-institute-of-technology'
+    wandb_notes: 'deit phase2 Run AL: continue AB K80 low-aug mix/cut soft_top2 from own checkpoint with LR 1e-4 to ep500; no CE shortcut'
+    wandb_tags:
+        - sqa
+        - phase2
+        - mlp-head
+        - tiny-bit
+        - k80
+        - low-aug
+        - mixup-cutmix-soft-top2
+        - continue-ab
+        - own-checkpoint
+        - low-lr
+        - no-ce-shortcut

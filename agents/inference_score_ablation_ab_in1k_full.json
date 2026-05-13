@@ -1,0 +1,71 @@
+{
+  "batch_size": 32,
+  "config_mode": "remote_run_AB_mlp_k80_lowaug_mixlabel",
+  "elapsed_sec": 822.1790232658386,
+  "ensembles": [
+    [
+      "lsb2_plus_msb2",
+      [
+        "lsb2",
+        "msb2"
+      ]
+    ],
+    [
+      "lsb4_plus_msb4",
+      [
+        "lsb4",
+        "msb4"
+      ]
+    ],
+    [
+      "lsb2_plus_lsb4",
+      [
+        "lsb2",
+        "lsb4"
+      ]
+    ],
+    [
+      "lsb2_plus_msb2_plus_lsb4_plus_msb4",
+      [
+        "lsb2",
+        "msb2",
+        "lsb4",
+        "msb4"
+      ]
+    ]
+  ],
+  "load_from": "/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval",
+  "max_examples": 50000,
+  "methods": [
+    "all",
+    "lsb2",
+    "msb2",
+    "lsb4",
+    "msb4"
+  ],
+  "metrics": {
+    "all_top1": 0.76584,
+    "all_top5": 0.80166,
+    "greedy_iter4_invalid": 4e-05,
+    "greedy_iter4_top1": 0.78336,
+    "greedy_single_invalid": 0.00276,
+    "greedy_single_top1": 0.76566,
+    "lsb2_plus_lsb4_top1": 0.78772,
+    "lsb2_plus_lsb4_top5": 0.87884,
+    "lsb2_plus_msb2_plus_lsb4_plus_msb4_top1": 0.7885,
+    "lsb2_plus_msb2_plus_lsb4_plus_msb4_top5": 0.88364,
+    "lsb2_plus_msb2_top1": 0.78762,
+    "lsb2_plus_msb2_top5": 0.86404,
+    "lsb2_top1": 0.786,
+    "lsb2_top5": 0.85768,
+    "lsb4_plus_msb4_top1": 0.78866,
+    "lsb4_plus_msb4_top5": 0.90126,
+    "lsb4_top1": 0.78796,
+    "lsb4_top5": 0.89636,
+    "msb2_top1": 0.78452,
+    "msb2_top5": 0.85488,
+    "msb4_top1": 0.78574,
+    "msb4_top5": 0.89066
+  },
+  "n_valid": 50000
+}

@@ -1,6 +1,6 @@
-# Run CG: CE sanity ablation, current code + old 6380 pre-mixup batch shuffle.
-# Purpose: isolate whether removing the old randperm before Mixup/CutMix caused
-# the CF sanity regression. Fresh CE run; no warm-start, no backbone load.
+# Run CH: CE sanity ablation, current code + old Flax approximate GELU.
+# Purpose: isolate whether switching backbone MLP GELU from approximate=True
+# to exact GELU caused the CF sanity regression. Fresh CE run; no warm-start.
 
 model: ViT_base_v3
 load_from: ''
@@ -16,7 +16,7 @@ dataset:
     reprob: 0.25
 
     use_mixup_cutmix: true
-    pre_mixup_shuffle: true
+    pre_mixup_shuffle: false
     mixup_prob: 1.0
     switch_prob: 0.5
     mixup_alpha: 0.8
@@ -43,11 +43,11 @@ logging:
     use_wandb: True
     wandb_project: 'deit'
     wandb_entity: 'sqa24-massachusetts-institute-of-technology'
-    wandb_notes: 'sanity-run CI: ViT_base_v3 old pre-mixup shuffle + approximate GELU; no warm-start'
+    wandb_notes: 'sanity-run CH: ViT_base_v3 current code + approximate GELU; no pre-mixup shuffle; no warm-start'
     wandb_tags:
         - sqa
         - phase1-sanity
         - v3-layerscale
-        - premix-shuffle
+        - approximate-gelu
         - b2-0.999
         - no-warm-start

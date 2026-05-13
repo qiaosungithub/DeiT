@@ -1,0 +1,55 @@
+{
+  "batch_size": 32,
+  "config_mode": "remote_run_AB_mlp_k80_lowaug_mixlabel",
+  "elapsed_sec": 496.08421206474304,
+  "ensembles": [
+    [
+      "lsb10_plus_msb10",
+      [
+        "lsb10",
+        "msb10"
+      ]
+    ],
+    [
+      "lsb10_plus_rand0",
+      [
+        "lsb10",
+        "rand0"
+      ]
+    ],
+    [
+      "lsb10_plus_msb10_plus_rand0",
+      [
+        "lsb10",
+        "msb10",
+        "rand0"
+      ]
+    ]
+  ],
+  "load_from": "/kmh-nfs-ssd-us-mount/logs/sqa/paligemma-baseline/20260511_093651_zbntix_kmh-tpuvm-v6e-8-spot-gzy-3djlis_asia-northeast1-b__b_lr_ep_eval",
+  "max_examples": 50000,
+  "methods": [
+    "lsb10",
+    "msb10",
+    "rand0"
+  ],
+  "metrics": {
+    "greedy_iter4_invalid": 4e-05,
+    "greedy_iter4_top1": 0.78336,
+    "greedy_single_invalid": 0.00276,
+    "greedy_single_top1": 0.76566,
+    "lsb10_plus_msb10_plus_rand0_top1": 0.78896,
+    "lsb10_plus_msb10_plus_rand0_top5": 0.9239,
+    "lsb10_plus_msb10_top1": 0.7888,
+    "lsb10_plus_msb10_top5": 0.92432,
+    "lsb10_plus_rand0_top1": 0.78828,
+    "lsb10_plus_rand0_top5": 0.92218,
+    "lsb10_top1": 0.7882,
+    "lsb10_top5": 0.92106,
+    "msb10_top1": 0.7875,
+    "msb10_top5": 0.9202,
+    "rand0_top1": 0.78838,
+    "rand0_top5": 0.92106
+  },
+  "n_valid": 50000
+}
