@@ -39,10 +39,6 @@
       background: var(--soft);
       border-left: 4px solid var(--accent);
     }
-    .todo {
-      background: #fff7e8;
-      border-left-color: var(--warn);
-    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -108,7 +104,7 @@
   <header>
     <p class="meta">6.8300 Computer Vision Final Project Draft</p>
     <h1>Can a Classifier Stop Paying One Logit Per Class?</h1>
-    <p class="authors"><strong>Authors:</strong> Qiao Sun &lt;sqa24@mit.edu&gt;; Yiyin Zhu &lt;evazhu@mit.edu&gt;</p>
+    <p class="authors"><strong>Authors:</strong> Qiao Sun &lt;sqa24@mit.edu&gt;; Yeyin Zhu &lt;evazhu@mit.edu&gt;</p>
     <p class="dek">Modern image classifiers almost universally terminate in a <strong>C-way logit head</strong>. This project challenges that default design. We replace the linear classifier over classes with a lightweight <strong>masked bit head</strong> that predicts a binary code for the label, reducing the output dimensionality from linear in C to logarithmic in C.</p>
   </header>
 
@@ -160,7 +156,7 @@
 
     <h3>Inference</h3>
     <p>At inference time, the lowest-cost classifier starts from an all-MASK bit sequence and predicts every bit once. We also evaluate a 4-step confidence decoder: at each step the head predicts all currently masked positions, and the most confident subset is fixed before the next step. This is the discriminative analogue of iterative masked generation.</p>
-    <p>We also evaluate an explicit class-code scorer. Instead of generating one bit string, the scorer enumerates the legal class codes and assigns each class a path-dependent score by revealing bits sequentially and accumulating their log probabilities. This produces a real top-k ranking over the valid classes, but it is no longer the logarithmic-cost operating point: with P one-bit reveal paths, the scorer makes <span class="inline-math">P log<sub>2</sub>C</span> passes over C candidate codes. Each pass still uses the lightweight bit head. We use this setting to test whether additional inference compute can recover top-k accuracy.</p>
+    <p>We also evaluate an explicit class-code scorer. Instead of generating one bit string, the scorer enumerates the legal class codes and assigns each class a path-dependent score by revealing bits sequentially and accumulating their log probabilities. This produces a full ranking of the valid classes, but it is no longer the logarithmic-cost operating point: with P one-bit reveal paths, the scorer makes <span class="inline-math">P log<sub>2</sub>C</span> passes over C candidate codes. Each pass still uses the lightweight bit head. We use this setting to test whether additional inference compute can recover recall@K.</p>
 
     <h3>Efficient multi-mask training</h3>
     <p>Diffusion-style training is often slower than ordinary classification because the model must learn many noise levels or mask patterns. A single image-label pair is not just one supervised example; it represents many possible partially masked bit strings. We exploit the fact that the image encoder is much more expensive than the bit head. For each image, the backbone is run once. The resulting feature is then repeated across K independently sampled bit masks, and only the lightweight head is evaluated K times.</p>
@@ -173,7 +169,11 @@
   <section>
     <h2>Experimental Setup</h2>
     <p>On ImageNet-1K we trained DeiT-B variants with a masked bit head for 330 epochs, batch size 1024, AdamW, learning rate 5e-4, weight decay 0.02, stochastic depth 0.05, and no CE shortcut or backbone warm-start. We use DeiT-B [1] as a standard supervised ViT backbone; the experimental variable is the replacement of the terminal classifier head. The best configuration used <code>K=80</code>, uniform mask ratios, low augmentation, mixup alpha 0.8, CutMix alpha 1.0, switch probability 0.5, and <code>soft_top2</code> label allocation.</p>
-    <p>For ImageNet-1K inference, we evaluate both generated-label decoding and explicit scoring of all 1000 legal class codes on the full 50,000-image validation set. The strongest explicit scorer uses 20 random one-bit reveal paths and aggregates them by mean rank. On ImageNet-21K-P, we evaluate a 10,450-class processed split with 14-bit labels. <strong>[TODO: collaborator confirm ImageNet-21K-P split, checkpoint, and validation protocol before final submission.]</strong></p>
+    <p>For ImageNet-1K inference, we evaluate both generated-label decoding and explicit scoring of all 1000 legal class codes on the full 50,000-image validation set. The strongest explicit scorer uses 20 random one-bit reveal paths and aggregates them by mean rank.</p>
+    <p>On ImageNet-21K-P we use the processed <code>winter21</code> split (10,450 classes) [9] and encode class ids as 14-bit LSB-first vectors. The masked-bit DeiT-B trained for 30 epochs at batch size 1024 on 8 GPUs with the same head and optimizer settings as the ImageNet-1K recipe: <code>K=80</code>, <code>soft_top2</code> supervision, AdamW (b2=0.95, lr 5e-4, wd 0.02), label smoothing 0.1, stochastic depth 0.05, mixup &alpha;=0.8, CutMix &alpha;=1.0, switch probability 0.5, low augmentation. A standard single-label cross-entropy softmax baseline was trained from the same DeiT-B initialization on the same data and budget.</p>
+    <p>Validation is on the full 522,000-image set. We report two decoders for the masked-bit head: 16-step iterative bit decoding, and explicit class-code scoring with 1, 5, and 20 one-bit LSB reveal paths under rank-mean aggregation. The 16-step decode and the 1-path scoring run cover a large fraction of the full set (about 38,000 images for 1-path). The 5- and 20-path scoring runs are more expensive (each additional path multiplies inference cost by C = 10,450) and are reported on ~1,400 and ~360-image prefixes of the same validation stream, at sample counts where per-batch top-1 and recall@5 had settled within &plusmn;0.5 pp.</p>
+    <p>The 30-epoch budget was intended; in practice cluster preemption and the project deadline truncated the masked-bit Run AB at epoch 21 and the softmax baseline at epoch 28. The numbers reported for both heads are from those checkpoints. Run AB&apos;s per-epoch numbers swing by ~0.2 pp over its last few epochs (Figure 3), so the truncation should not materially affect the comparisons.</p>
+    <p>A note on metrics. Top-1 throughout this report is the standard single-prediction accuracy: the fraction of validation images whose ground-truth class equals the head&#39;s top-ranked candidate. We use <em>recall@5</em> rather than &ldquo;top-5 accuracy&rdquo; for the size-5 candidate set: under multi-path explicit class-code scoring the candidates are ordered by rank-mean across reveal paths rather than by a single probability, so they are not the &ldquo;five highest probabilities&rdquo; the conventional top-5 label suggests. Recall@5 has the same arithmetic value as top-5 accuracy when the ranking does come from a single probability vector (as for the softmax baselines and the standard ImageNet-1K results we cite), so the comparison across rows in Tables 1, 2, and 4 is well-defined.</p>
   </section>
 
   <section>
@@ -185,11 +185,11 @@
       </thead>
       <tbody>
         <tr><td>CoCa finetuned [11]</td><td>1,000</td><td>O(C) logits</td><td>Top-1: 91.0</td><td>not reported</td><td>SOTA</td></tr>
-        <tr><td>DeiT-B [1]</td><td>1,000</td><td>O(C) logits</td><td>Top-1: 81.8</td><td>Top-5: 95.6</td><td>baseline</td></tr>
-        <tr><td>Ours: generated-label decode</td><td>1,000</td><td>O(log C) head; O(4 log C) decode</td><td>78.34 iterative decode</td><td>n/a</td><td>low-cost</td></tr>
-        <tr><td>Ours: explicit class-code scoring</td><td>1,000</td><td>O(log C) head; 200C scoring passes</td><td>Top-1: 78.87</td><td>Top-5: 92.73</td><td>scored</td></tr>
+        <tr><td>DeiT-B [1]</td><td>1,000</td><td>O(C) logits</td><td>Top-1: 81.8</td><td>Recall@5: 95.6</td><td>baseline</td></tr>
+        <tr><td>Ours: generated-label decode</td><td>1,000</td><td>O(log C) head; O(4 log C) decode</td><td>Top-1: 78.34</td><td>n/a</td><td>4-step iterative</td></tr>
+        <tr><td>Ours: explicit class-code scoring</td><td>1,000</td><td>O(log C) head; 200C scoring passes</td><td>Top-1: 78.87</td><td>Recall@5: 92.73</td><td>scored</td></tr>
       </tbody>
-      <caption>Table 1. ImageNet-1K comparison. The low-cost decoder generates a single label; explicit class-code scoring ranks all legal labels and therefore supports standard top-k evaluation under the learned bit scorer.</caption>
+      <caption>Table 1. ImageNet-1K comparison. The low-cost decoder generates a single label; explicit class-code scoring ranks all legal labels and therefore supports recall@K evaluation under the learned bit scorer.</caption>
     </table>
 
     <h3>ImageNet-21K-P</h3>
@@ -198,17 +198,21 @@
         <tr><th>Method</th><th>Classes</th><th>Head / inference cost</th><th>Primary metric</th><th>Secondary metric</th><th>Comment</th></tr>
       </thead>
       <tbody>
-        <tr><td>Ridnik et al., TResNet-L single-label [9]</td><td>11,221</td><td>O(C)</td><td>Top-1: 45.5</td><td>Top-5: 75.6</td><td>published</td></tr>
-        <tr><td>Differentiable Top-k, DiffSortNets [10]</td><td>ImageNet-21K-P</td><td>O(C)</td><td>Top-1: 40.22</td><td>Top-5: 70.88</td><td>top-k loss</td></tr>
-        <tr><td>Ours: completed masked-bit model</td><td>10,450</td><td>O(log C) one-shot; O(5 log C) for 5-decode vote</td><td>41.89 single decode</td><td>50.35 5-decode vote</td><td>ours</td></tr>
+        <tr><td>Ridnik et al., TResNet-L single-label [9]</td><td>11,221</td><td>O(C) logits</td><td>Top-1: 45.5</td><td>Recall@5: 75.6</td><td>published</td></tr>
+        <tr><td>Differentiable Top-k, DiffSortNets [10]</td><td>ImageNet-21K-P</td><td>O(C) logits</td><td>Top-1: 40.22</td><td>Recall@5: 70.88</td><td>top-k loss</td></tr>
+        <tr><td>Ours: DeiT-B, C-way softmax</td><td>10,450</td><td>O(C) logits</td><td>Top-1: 48.45</td><td>Recall@5: 78.76</td><td>our baseline</td></tr>
+        <tr><td>Ours: masked-bit head, iterative decode</td><td>10,450</td><td>O(log C) head, 16 head passes</td><td>Top-1: 44.11</td><td>Recall@5: 49.75</td><td>generated label</td></tr>
+        <tr><td>Ours: masked-bit head, 1-path class scoring</td><td>10,450</td><td>O(log C) head, 14C scoring passes</td><td>Top-1: 44.45</td><td>Recall@5: 73.13</td><td>1 LSB path, 38k val</td></tr>
+        <tr><td>Ours: masked-bit head, 5-path rankmean scoring</td><td>10,450</td><td>O(log C) head, 70C scoring passes</td><td>Top-1: 42.50</td><td>Recall@5: 74.65</td><td>5-path, 1.4k val</td></tr>
+        <tr><td>Ours: masked-bit head, 20-path rankmean scoring</td><td>10,450</td><td>O(log C) head, 280C scoring passes</td><td>Top-1: 43.06</td><td>Recall@5: 74.44</td><td>20-path, 360 val (partial)</td></tr>
       </tbody>
-      <caption>Table 2. ImageNet-21K-P comparison. Conventional methods report standard top-1/top-5 accuracy; our secondary metric is generated-label vote accuracy.</caption>
+      <caption>Table 2. ImageNet-21K-P, 10,450-class processed split. Our DeiT-B softmax baseline and the masked-bit head share the same initialization and 30-epoch budget; the two published rows are reproduced from the cited papers. The masked-bit head is reported under 16-step iterative decoding and under explicit class-code scoring with 1, 5, and 20 one-bit reveal paths (rank-mean). The 5- and 20-path numbers are computed on validation prefixes (~1,400 and ~360 images) because each additional path multiplies inference cost by the path count over 10,450 candidate codes; per-batch top-1 and recall@5 had stabilized within &plusmn;0.5 pp at the sample counts shown. A retired cross-attention head, included as a comparison curve in Figure 3, is omitted here because it was not re-evaluated under the final eval pass.</caption>
     </table>
   </section>
 
   <section>
     <h2>Ablations</h2>
-    <p>All ablations in this section are conducted on ImageNet-1K.</p>
+    <p>The first four subsections present ablations on ImageNet-1K; an ImageNet-21K-P trajectory and a K ablation follow at the end of the section.</p>
     <h3>Training curve</h3>
     <figure>
       <img src="assets/best_training_curve.svg" alt="Masked-bit classifier learning curve on ImageNet-1K." />
@@ -236,7 +240,7 @@
 
     <h3>Inference-budget ablation</h3>
     <table>
-      <thead><tr><th>Inference mode</th><th>Cost after image encoding</th><th>Top-1</th><th>Top-5</th><th>Takeaway</th></tr></thead>
+      <thead><tr><th>Inference mode</th><th>Cost after image encoding</th><th>Top-1</th><th>Recall@5</th><th>Takeaway</th></tr></thead>
       <tbody>
         <tr><td>Greedy all-mask generated label</td><td>1 head pass</td><td>76.57</td><td>n/a</td><td>fastest</td></tr>
         <tr><td>4-step confidence generated label</td><td>4 head passes</td><td>78.34</td><td>n/a</td><td>low-cost best</td></tr>
@@ -244,10 +248,22 @@
         <tr><td>4-chunk LSB class scoring</td><td>4C scoring passes</td><td>78.80</td><td>89.64</td><td>path helps</td></tr>
         <tr><td>10-step LSB class scoring</td><td>10C scoring passes</td><td>78.82</td><td>92.11</td><td>granularity helps</td></tr>
         <tr><td>5-path logmeanexp scoring</td><td>50C scoring passes</td><td><strong>78.91</strong></td><td>92.37</td><td>best top-1</td></tr>
-        <tr><td>20-random-path rankmean scoring</td><td>200C scoring passes</td><td>78.87</td><td><strong>92.73</strong></td><td>best top-5</td></tr>
+        <tr><td>20-random-path rankmean scoring</td><td>200C scoring passes</td><td>78.87</td><td><strong>92.73</strong></td><td>best recall@5</td></tr>
       </tbody>
       <caption>Table 4. Inference-budget ablation on ImageNet-1K. C denotes the number of legal class codes; each scoring pass uses the same lightweight O(log C) bit head.</caption>
     </table>
+
+    <h3>ImageNet-21K-P training trajectory</h3>
+    <figure>
+      <img src="assets/in21kp_training_curve.svg" alt="Validation top-1 trajectories on ImageNet-21K-P across the four trained heads." />
+      <figcaption>Figure 3. Validation top-1 on ImageNet-21K-P, recorded at every epoch boundary. Standard CE uses one-pass softmax; the three masked-bit runs use 8-step iterative decoding. (The recall@5 numbers in Table 2 come from explicit class-code scoring at inference time, not from this iterative decoder, so they are not on this plot.) After the first few epochs the four curves run roughly parallel: the masked-bit runs trail softmax by about 5&ndash;7 pp on top-1, which looks like a level shift rather than a slower convergence rate. Both MLP-head runs (K=10 and K=80 Run AB) were truncated at epoch 21 by cluster preemption and the deadline; only the older cross-attention run reached epoch 28. The Run AB row in Table 2 is from the K=80 checkpoint at epoch 21.</figcaption>
+    </figure>
+
+    <h3>ImageNet-21K-P: mask samples per image forward</h3>
+    <figure>
+      <img src="assets/in21kp_mask_ablation.svg" alt="K-mask ablation on ImageNet-21K-P." />
+      <figcaption>Figure 4. K=10 versus K=80 + Mixup/CutMix on ImageNet-21K-P, 8-step iterative top-1. K=10 stays ahead of the Run AB recipe throughout the first 22 epochs &mdash; the opposite of the ImageNet-1K behavior in Figure 2. The K=80 + Mixup recipe is tuned for a 300+ epoch horizon (Table 3), and within our 30-epoch budget its stronger regularization slows early learning; the crossover with K=10 has not yet occurred. We still use the K=80 checkpoint for the Table 2 headline number to keep the recipe consistent across the two datasets.</figcaption>
+    </figure>
   </section>
 
   <section>
@@ -259,16 +275,17 @@
   <section>
     <h2>Limitations</h2>
     <p>The masked-bit head is class-efficient, but it loses some conveniences of a standard logit head. A softmax classifier directly produces a normalized distribution over all classes. Our decoder instead produces one or several class codes. As a result, computing calibrated per-class probabilities is not immediate; it requires either additional scoring over candidate codes or an expensive pass over all valid class codes.</p>
-    <p>The binary code itself is also a modeling choice. In this implementation, class ids are encoded as ordinary binary integers, so nearby codes are not necessarily semantically related. This makes bit errors uneven: flipping a high-order bit can move the prediction to an unrelated class. In addition, when C is not a power of two, some bit strings are invalid class labels. The model learns to avoid most invalid codes, but the issue is absent in a conventional C-way head.</p>
-    <p>Finally, there is a tradeoff between logarithmic-cost decoding and top-k evaluation. Generated-label decoding preserves the intended low-cost inference path, but it does not rank every class. Explicit class-code scoring produces a standard top-k list over legal classes, but its cost scales with C because every candidate code is scored.</p>
+    <p>The binary code itself is also a modeling choice. In this implementation, class ids are encoded as ordinary binary integers, so nearby codes are not necessarily semantically related. This makes bit errors uneven: flipping a high-order bit can move the prediction to an unrelated class. In addition, when C is not a power of two, some bit strings are invalid class labels. The model learns to avoid most invalid codes, but the issue is absent in a conventional C-way head. On ImageNet-21K-P, 36% of the 2<sup>14</sup> bit patterns are invalid class ids, versus 2.3% of 2<sup>10</sup> patterns on ImageNet-1K. Even so, the 16-step iterative decoder produced no invalid codes on the validation set &mdash; the model learns to avoid the invalid region more aggressively than the prior on bit-pattern legality alone would suggest.</p>
+    <p>Finally, there is a tradeoff between logarithmic-cost decoding and recall@K evaluation. Generated-label decoding preserves the intended low-cost inference path, but it does not rank every class. Explicit class-code scoring produces a size-K candidate set over legal classes, but its cost scales with C because every candidate code is scored.</p>
   </section>
 
   <section>
     <h2>Discussion</h2>
-    <p>The principal positive result is that a classifier can learn a nontrivial visual decision rule without a C-way logit head. The masked-bit head reaches 78.34% low-cost generated-label accuracy on ImageNet-1K, and explicit class-code scoring improves the same checkpoint to 78.87% top-1 and 92.73% top-5. The model also learns on a 10K-class ImageNet-21K-P split. This is a feasibility result for class-efficient output heads: the number of predicted output channels is 20 on ImageNet-1K and 28 on ImageNet-21K-P, rather than 1000 or 10,450.</p>
+    <p>The principal positive result is that a classifier can learn a nontrivial visual decision rule without a C-way logit head. The masked-bit head reaches 78.34% low-cost generated-label accuracy on ImageNet-1K, and explicit class-code scoring improves the same checkpoint to 78.87% top-1 and 92.73% recall@5 at the 20-path rankmean operating point (the best top-1 across all scoring settings, 5-path logmeanexp, is 78.91%). On ImageNet-21K-P the same head reaches 44.45% top-1 and 73.13% recall@5 with one-path explicit scoring, rising to 74.65% recall@5 with 5-path rank-mean scoring; a DeiT-B softmax baseline trained from the same initialization for the same 30 epochs lands at 48.45% / 78.76%. This is a feasibility result for class-efficient output heads: the number of predicted output channels is 20 on ImageNet-1K and 28 on ImageNet-21K-P, rather than 1000 or 10,450.</p>
     <p>The main limitation is that bit-factorized prediction is not yet a drop-in accuracy replacement for softmax classification. Accuracy remains below conventional classifiers, especially on ImageNet-1K. Some of this gap may be attributable to the unresolved DeiT reproduction gap in our codebase, but the ablations also indicate genuine modeling challenges.</p>
     <p>The experiments also show that the masking protocol is central to the method. Early runs were weak when mixed images were supervised by hard argmax labels and evaluation used only all-mask single-step decoding. Correcting mixup/CutMix supervision, increasing the number of mask samples K, and using iterative decoding changed the method from a near-random baseline into a mature 76-78% ImageNet-1K classifier. This is consistent with the BAR result in generative modeling: masked bit prediction is effective only when training masks and inference schedules are treated as first-class components of the model.</p>
-    <p>The inference sweep clarifies where the method is strong. Extra scoring compute gives a large top-5 improvement, from 80.17% under all-mask class scoring to 92.73% under 20 random one-bit paths. Top-1 improves much less, from 78.34% low-cost iterative decoding to 78.91% under the best explicit scorer. This suggests that the model often assigns useful probability mass to the right neighborhood of labels, but its first choice remains the main bottleneck.</p>
+    <p>The inference sweep clarifies where the method is strong. Extra scoring compute gives a large recall@5 improvement, from 80.17% under all-mask class scoring to 92.73% under 20 random one-bit paths. Top-1 improves much less, from 78.34% low-cost iterative decoding to 78.91% under the best explicit scorer. This suggests that the model often assigns useful probability mass to the right neighborhood of labels, but its first choice remains the main bottleneck.</p>
+    <p>The same recall@5 pattern appears on ImageNet-21K-P. Switching from 16-step iterative decoding (49.75% recall@5) to one-path explicit class-code scoring (73.13%) closes most of the gap to softmax recall@5 (78.76%) on a 10&times; larger label space; the remaining gap is roughly 4 pp at 5-path scoring (74.65% vs 78.76%). Top-1 behaves differently here: adding paths and rank-mean aggregation gives a further small recall@5 gain (73.13% &rarr; 74.65% at 5 paths, 74.44% at 20 paths) but costs about two points of top-1 (44.45% &rarr; 42.50% at 5 paths, 43.06% at 20 paths). This trade-off is much smaller on ImageNet-1K (5-path logmeanexp 78.91 vs 20-path rankmean 78.87, a 0.04 pp drop) than on ImageNet-21K-P (1.95 pp). We suspect it is partly the larger label space &mdash; with 10&times; more candidate codes, rank-mean disagreement across paths is more frequent &mdash; and partly the much shorter training budget on ImageNet-21K-P, which leaves first-bit predictions less sharp and therefore more sensitive to path-to-path noise.</p>
   </section>
 
   <section>
